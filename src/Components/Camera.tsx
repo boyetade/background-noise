@@ -3,12 +3,7 @@ import Webcam from "react-webcam";
 import * as bodySegmentation from "@tensorflow-models/body-segmentation";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
-import {
-  buildBackgroundSnapshot,
-  detectBackgroundObjectBoxes,
-  drawBackgroundObjectBoxes,
-  drawPersonLayerOnTop,
-} from "../utils/backgroundBusyness";
+import { drawPersonCutoutOnTop } from "../utils/personCutout";
 import { createAlignedPersonMask } from "../utils/segmentationMask";
 import { createGifFromFrames } from "../utils/createGifFromFrames";
 
@@ -60,14 +55,13 @@ export const Camera = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const webcamRef = useRef<Webcam>(null);
   const segmenterRef = useRef<bodySegmentation.BodySegmenter | null>(null);
-  const previousBackgroundRef = useRef<Uint8ClampedArray | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<number | null>(null);
   const recordingIntervalRef = useRef<number | null>(null);
   const videoFramesRef = useRef<ImageData[]>([]);
   const [isModelLoading, setIsModelLoading] = useState(true);
-  const [detectedObjectCount, setDetectedObjectCount] = useState(0);
+  const [personDetected, setPersonDetected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTimeLeftMs, setRecordingTimeLeftMs] =
     useState(MAX_RECORDING_MS);
@@ -252,20 +246,8 @@ export const Camera = () => {
             canvas.height,
           );
 
-          const objectBoxes = detectBackgroundObjectBoxes(
-            frame,
-            personMask,
-            previousBackgroundRef.current,
-          );
-
-          drawBackgroundObjectBoxes(ctx, objectBoxes);
-          drawPersonLayerOnTop(ctx, frame, personMask);
-          setDetectedObjectCount(objectBoxes.length);
-
-          previousBackgroundRef.current = buildBackgroundSnapshot(
-            frame,
-            personMask,
-          );
+          const hasPerson = drawPersonCutoutOnTop(ctx, frame, personMask);
+          setPersonDetected(hasPerson);
         } finally {
           isProcessing = false;
         }
@@ -300,7 +282,6 @@ export const Camera = () => {
 
       segmenterRef.current?.dispose();
       segmenterRef.current = null;
-      previousBackgroundRef.current = null;
 
       setRecordedVideoUrl((previousUrl) => {
         if (previousUrl) {
@@ -348,13 +329,15 @@ export const Camera = () => {
 
   return (
     <div>
-      {isModelLoading && <p>Loading background detection model...</p>}
+      {isModelLoading && <p>Loading person detection model...</p>}
 
       <div>
-        <p>Background object detection</p>
+        <p>Camera</p>
         <canvas ref={canvasRef} width={500} height={500} />
         <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-          Background objects detected: {detectedObjectCount}
+          {personDetected
+            ? "Person detected · cutout active (black & white)"
+            : "No person detected"}
         </p>
       </div>
 
@@ -373,17 +356,23 @@ export const Camera = () => {
           </p>
         )}
 
-        <p style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "0.75rem" }}>
+        <p
+          style={{
+            fontSize: "0.875rem",
+            color: "#6b7280",
+            marginTop: "0.75rem",
+          }}
+        >
           Captured frames: {capturedFrameCount} / {MAX_FRAMES} (every 0.5s while
           recording)
         </p>
 
         {recordedVideoUrl && (
           <div style={{ marginTop: "1rem" }}>
-            <p>Recorded video with background object markers</p>
+            <p>Recorded video</p>
             <video src={recordedVideoUrl} controls width={500} />
             <p style={{ marginTop: "0.5rem" }}>
-              <a href={recordedVideoUrl} download="background-detection.webm">
+              <a href={recordedVideoUrl} download="camera-recording.webm">
                 Download video
               </a>
             </p>
