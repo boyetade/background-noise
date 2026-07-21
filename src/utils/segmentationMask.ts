@@ -30,12 +30,12 @@ export async function createAlignedPersonMask(
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = rawMask.width;
   sourceCanvas.height = rawMask.height;
-  sourceCanvas.getContext("2d")!.putImageData(rawMask, 0, 0);
+  sourceCanvas.getContext("2d", { willReadFrequently: true })!.putImageData(rawMask, 0, 0);
 
   const scaledCanvas = document.createElement("canvas");
   scaledCanvas.width = width;
   scaledCanvas.height = height;
-  const scaledCtx = scaledCanvas.getContext("2d")!;
+  const scaledCtx = scaledCanvas.getContext("2d", { willReadFrequently: true })!;
   scaledCtx.drawImage(sourceCanvas, 0, 0, width, height);
 
   const scaledMask = scaledCtx.getImageData(0, 0, width, height);

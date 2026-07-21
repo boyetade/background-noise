@@ -5,6 +5,7 @@ import Webcam from "react-webcam";
 // import "@tensorflow/tfjs-backend-webgl";
 // import { maskPersonFromFrame } from "../utils/backgroundBusyness";
 // import { createAlignedPersonMask } from "../utils/segmentationMask";
+import { createGifFromFrames } from "../utils/createGifFromFrames";
 
 function syncCanvasSize(
   canvas: HTMLCanvasElement,
@@ -27,11 +28,35 @@ function syncCanvasSize(
 
 const MAX_RECORDING_MS = 8000;
 const RECORDING_FPS = 30;
+const FRAME_CAPTURE_INTERVAL_MS = 500;
+const MAX_FRAMES = 15;
 
 function getSupportedMimeType(): string {
-  const types = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  const types = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
 
-  return types.find((type) => MediaRecorder.isTypeSupported(type)) ?? "video/webm";
+  return (
+    types.find((type) => MediaRecorder.isTypeSupported(type)) ?? "video/webm"
+  );
+}
+
+function captureVideoFrame(video: HTMLVideoElement): ImageData | null {
+  if (video.videoWidth === 0 || video.videoHeight === 0) {
+    return null;
+  }
+
+  const captureCanvas = document.createElement("canvas");
+  captureCanvas.width = video.videoWidth;
+  captureCanvas.height = video.videoHeight;
+
+  const ctx = captureCanvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+
+  ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+  return ctx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
 }
 
 export const Camera = () => {
@@ -44,12 +69,42 @@ export const Camera = () => {
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<number | null>(null);
   const recordingIntervalRef = useRef<number | null>(null);
+  const videoFramesRef = useRef<ImageData[]>([]);
   // const previousBackgroundRef = useRef<Uint8ClampedArray | null>(null);
   // const smoothedBusynessRef = useRef(0);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTimeLeftMs, setRecordingTimeLeftMs] = useState(MAX_RECORDING_MS);
+  const [recordingTimeLeftMs, setRecordingTimeLeftMs] =
+    useState(MAX_RECORDING_MS);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+  const [capturedFrameCount, setCapturedFrameCount] = useState(0);
+  const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [isCreatingGif, setIsCreatingGif] = useState(false);
+  const [gifError, setGifError] = useState<string | null>(null);
   // const [metrics, setMetrics] = useState<BackgroundAnalysis>(INITIAL_METRICS);
+
+  const buildGifFromCapturedFrames = async () => {
+    const frames = videoFramesRef.current;
+    if (frames.length === 0 || isCreatingGif) return;
+
+    setIsCreatingGif(true);
+    setGifError(null);
+
+    try {
+      const gifDataUrl = await createGifFromFrames(frames);
+      setGifUrl((previousUrl) => {
+        if (previousUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(previousUrl);
+        }
+        return gifDataUrl;
+      });
+    } catch (error) {
+      setGifError(
+        error instanceof Error ? error.message : "Failed to create GIF",
+      );
+    } finally {
+      setIsCreatingGif(false);
+    }
+  };
 
   const clearRecordingTimers = () => {
     if (recordingTimeoutRef.current !== null) {
@@ -75,6 +130,11 @@ export const Camera = () => {
   const startRecording = () => {
     const canvas = canvasRef.current;
     if (!canvas || isRecording) return;
+
+    videoFramesRef.current = [];
+    setCapturedFrameCount(0);
+    setGifUrl(null);
+    setGifError(null);
 
     const stream = canvas.captureStream(RECORDING_FPS);
     const mimeType = getSupportedMimeType();
@@ -104,6 +164,8 @@ export const Camera = () => {
       setIsRecording(false);
       setRecordingTimeLeftMs(MAX_RECORDING_MS);
       mediaRecorderRef.current = null;
+
+      void buildGifFromCapturedFrames();
     };
 
     mediaRecorderRef.current = recorder;
@@ -181,8 +243,41 @@ export const Camera = () => {
         }
         return null;
       });
+      setGifUrl(null);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const captureFrame = () => {
+      const video = webcamRef.current?.video;
+      if (!video || video.readyState < video.HAVE_ENOUGH_DATA) {
+        return;
+      }
+
+      const frame = captureVideoFrame(video);
+      if (!frame) return;
+
+      if (videoFramesRef.current.length >= MAX_FRAMES) {
+        return;
+      }
+
+      videoFramesRef.current.push(frame);
+      setCapturedFrameCount(videoFramesRef.current.length);
+    };
+
+    captureFrame();
+
+    const frameCaptureIntervalId = window.setInterval(
+      captureFrame,
+      FRAME_CAPTURE_INTERVAL_MS,
+    );
+
+    return () => {
+      window.clearInterval(frameCaptureIntervalId);
+    };
+  }, [isRecording]);
 
   // const busynessPercent = Math.round(metrics.busyness * 100);
   const recordingSecondsLeft = (recordingTimeLeftMs / 1000).toFixed(1);
@@ -193,6 +288,10 @@ export const Camera = () => {
         <div>
           <p>Camera</p>
           <canvas ref={canvasRef} width={500} height={500} />
+          <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+            Captured frames: {capturedFrameCount} / {MAX_FRAMES} (every 0.5s
+            while recording)
+          </p>
         </div>
         {/* <div>
           <p>Background busyness map</p>
@@ -208,11 +307,7 @@ export const Camera = () => {
       </div>
 
       <div style={{ marginTop: "1rem" }}>
-        <button
-          type="button"
-          onClick={startRecording}
-          disabled={isRecording}
-        >
+        <button type="button" onClick={startRecording} disabled={isRecording}>
           {isRecording ? "Recording..." : "Record 8 second video"}
         </button>
 
@@ -233,6 +328,36 @@ export const Camera = () => {
             </p>
           </div>
         )}
+
+        <div style={{ marginTop: "1rem" }}>
+          <button
+            type="button"
+            onClick={() => void buildGifFromCapturedFrames()}
+            disabled={isCreatingGif || capturedFrameCount === 0}
+          >
+            {isCreatingGif ? "Creating GIF..." : "Create GIF from frames"}
+          </button>
+
+          {gifError && (
+            <p style={{ marginTop: "0.75rem", color: "#dc2626" }}>{gifError}</p>
+          )}
+
+          {gifUrl && (
+            <div style={{ marginTop: "1rem" }}>
+              <p>Generated GIF</p>
+              <img
+                src={gifUrl}
+                alt="Generated from captured frames"
+                width={500}
+              />
+              <p style={{ marginTop: "0.5rem" }}>
+                <a href={gifUrl} download="camera-recording.gif">
+                  Download GIF
+                </a>
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <Webcam
