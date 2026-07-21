@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
-// import * as bodySegmentation from "@tensorflow-models/body-segmentation";
-// import * as tf from "@tensorflow/tfjs";
-// import "@tensorflow/tfjs-backend-webgl";
-// import { maskPersonFromFrame } from "../utils/backgroundBusyness";
-// import { createAlignedPersonMask } from "../utils/segmentationMask";
+import * as bodySegmentation from "@tensorflow-models/body-segmentation";
+import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-backend-webgl";
+import {
+  buildBackgroundSnapshot,
+  detectBackgroundObjectBoxes,
+  drawBackgroundObjectBoxes,
+  drawPersonLayerOnTop,
+} from "../utils/backgroundBusyness";
+import { createAlignedPersonMask } from "../utils/segmentationMask";
 import { createGifFromFrames } from "../utils/createGifFromFrames";
 
 function syncCanvasSize(
@@ -17,14 +22,6 @@ function syncCanvasSize(
     canvas.height = height;
   }
 }
-
-// const INITIAL_METRICS: BackgroundAnalysis = {
-//   busyness: 0,
-//   motion: 0,
-//   complexity: 0,
-//   objectRegions: 0,
-//   level: "quiet",
-// };
 
 const MAX_RECORDING_MS = 8000;
 const RECORDING_FPS = 30;
@@ -61,17 +58,16 @@ function captureVideoFrame(video: HTMLVideoElement): ImageData | null {
 
 export const Camera = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  // const activityCanvasRef = useRef<HTMLCanvasElement>(null);
-  // const blueBackgroundCanvasRef = useRef<HTMLCanvasElement>(null);
   const webcamRef = useRef<Webcam>(null);
-  // const segmenterRef = useRef<bodySegmentation.BodySegmenter | null>(null);
+  const segmenterRef = useRef<bodySegmentation.BodySegmenter | null>(null);
+  const previousBackgroundRef = useRef<Uint8ClampedArray | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<number | null>(null);
   const recordingIntervalRef = useRef<number | null>(null);
   const videoFramesRef = useRef<ImageData[]>([]);
-  // const previousBackgroundRef = useRef<Uint8ClampedArray | null>(null);
-  // const smoothedBusynessRef = useRef(0);
+  const [isModelLoading, setIsModelLoading] = useState(true);
+  const [detectedObjectCount, setDetectedObjectCount] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTimeLeftMs, setRecordingTimeLeftMs] =
     useState(MAX_RECORDING_MS);
@@ -80,7 +76,6 @@ export const Camera = () => {
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [isCreatingGif, setIsCreatingGif] = useState(false);
   const [gifError, setGifError] = useState<string | null>(null);
-  // const [metrics, setMetrics] = useState<BackgroundAnalysis>(INITIAL_METRICS);
 
   const buildGifFromCapturedFrames = async () => {
     const frames = videoFramesRef.current;
@@ -129,7 +124,7 @@ export const Camera = () => {
 
   const startRecording = () => {
     const canvas = canvasRef.current;
-    if (!canvas || isRecording) return;
+    if (!canvas || isRecording || isModelLoading) return;
 
     videoFramesRef.current = [];
     setCapturedFrameCount(0);
@@ -188,35 +183,103 @@ export const Camera = () => {
   useEffect(() => {
     let cancelled = false;
     let animationFrameId = 0;
+    let isProcessing = false;
 
-    const processFrame = () => {
-      if (cancelled) return;
+    const init = async () => {
+      await tf.setBackend("webgl");
+      await tf.ready();
 
-      const video = webcamRef.current?.video;
-      const canvas = canvasRef.current;
+      const segmenter = await bodySegmentation.createSegmenter(
+        bodySegmentation.SupportedModels.BodyPix,
+        {
+          architecture: "MobileNetV1",
+          outputStride: 16,
+          multiplier: 0.75,
+          quantBytes: 4,
+        },
+      );
 
-      if (!video || !canvas || video.readyState < video.HAVE_ENOUGH_DATA) {
+      if (cancelled) {
+        segmenter.dispose();
         return;
       }
 
-      syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
+      segmenterRef.current = segmenter;
+      setIsModelLoading(false);
 
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      const processFrame = async () => {
+        if (cancelled || isProcessing) return;
 
-      ctx.save();
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      ctx.restore();
+        const video = webcamRef.current?.video;
+        const canvas = canvasRef.current;
+        const segmenter = segmenterRef.current;
+
+        if (
+          !video ||
+          !canvas ||
+          !segmenter ||
+          video.readyState < video.HAVE_ENOUGH_DATA
+        ) {
+          return;
+        }
+
+        isProcessing = true;
+
+        try {
+          syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
+
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (!ctx) return;
+
+          ctx.save();
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
+
+          const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const segmentations = await segmenter.segmentPeople(canvas, {
+            flipHorizontal: false,
+            multiSegmentation: false,
+            segmentBodyParts: false,
+            internalResolution: "high",
+            segmentationThreshold: 0.7,
+          });
+
+          const personMask = await createAlignedPersonMask(
+            segmentations,
+            canvas.width,
+            canvas.height,
+          );
+
+          const objectBoxes = detectBackgroundObjectBoxes(
+            frame,
+            personMask,
+            previousBackgroundRef.current,
+          );
+
+          drawBackgroundObjectBoxes(ctx, objectBoxes);
+          drawPersonLayerOnTop(ctx, frame, personMask);
+          setDetectedObjectCount(objectBoxes.length);
+
+          previousBackgroundRef.current = buildBackgroundSnapshot(
+            frame,
+            personMask,
+          );
+        } finally {
+          isProcessing = false;
+        }
+      };
+
+      const tick = () => {
+        animationFrameId = requestAnimationFrame(tick);
+        void processFrame();
+      };
+
+      tick();
     };
 
-    const tick = () => {
-      animationFrameId = requestAnimationFrame(tick);
-      processFrame();
-    };
-
-    tick();
+    void init();
 
     return () => {
       cancelled = true;
@@ -235,8 +298,10 @@ export const Camera = () => {
         recorder.stop();
       }
 
-      // segmenterRef.current?.dispose();
-      // segmenterRef.current = null;
+      segmenterRef.current?.dispose();
+      segmenterRef.current = null;
+      previousBackgroundRef.current = null;
+
       setRecordedVideoUrl((previousUrl) => {
         if (previousUrl) {
           URL.revokeObjectURL(previousUrl);
@@ -279,35 +344,26 @@ export const Camera = () => {
     };
   }, [isRecording]);
 
-  // const busynessPercent = Math.round(metrics.busyness * 100);
   const recordingSecondsLeft = (recordingTimeLeftMs / 1000).toFixed(1);
 
   return (
     <div>
-      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-        <div>
-          <p>Camera</p>
-          <canvas ref={canvasRef} width={500} height={500} />
-          <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-            Captured frames: {capturedFrameCount} / {MAX_FRAMES} (every 0.5s
-            while recording)
-          </p>
-        </div>
-        {/* <div>
-          <p>Background busyness map</p>
-          <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
-            Blue = calm, yellow = some objects, red = busy/moving
-          </p>
-          <canvas ref={activityCanvasRef} width={500} height={500} />
-        </div>
-        <div>
-          <p>Blue background</p>
-          <canvas ref={blueBackgroundCanvasRef} width={500} height={500} />
-        </div> */}
+      {isModelLoading && <p>Loading background detection model...</p>}
+
+      <div>
+        <p>Background object detection</p>
+        <canvas ref={canvasRef} width={500} height={500} />
+        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+          Background objects detected: {detectedObjectCount}
+        </p>
       </div>
 
       <div style={{ marginTop: "1rem" }}>
-        <button type="button" onClick={startRecording} disabled={isRecording}>
+        <button
+          type="button"
+          onClick={startRecording}
+          disabled={isRecording || isModelLoading}
+        >
           {isRecording ? "Recording..." : "Record 8 second video"}
         </button>
 
@@ -317,13 +373,18 @@ export const Camera = () => {
           </p>
         )}
 
+        <p style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "0.75rem" }}>
+          Captured frames: {capturedFrameCount} / {MAX_FRAMES} (every 0.5s while
+          recording)
+        </p>
+
         {recordedVideoUrl && (
           <div style={{ marginTop: "1rem" }}>
-            <p>Recorded clip</p>
+            <p>Recorded video with background object markers</p>
             <video src={recordedVideoUrl} controls width={500} />
             <p style={{ marginTop: "0.5rem" }}>
-              <a href={recordedVideoUrl} download="background-recording.webm">
-                Download recording
+              <a href={recordedVideoUrl} download="background-detection.webm">
+                Download video
               </a>
             </p>
           </div>

@@ -8,6 +8,13 @@ export type BackgroundAnalysis = {
   level: BusynessLevel;
 };
 
+export type BackgroundObjectBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 const GRID_SIZE = 12;
 const MOTION_THRESHOLD = 28;
 const EDGE_THRESHOLD = 45;
@@ -242,6 +249,125 @@ export function renderBusynessHeatmap(
   }
 
   return output;
+}
+
+export function detectBackgroundObjectBoxes(
+  frame: ImageData,
+  personMask: ImageData,
+  previousBackground: Uint8ClampedArray | null,
+): BackgroundObjectBox[] {
+  const { width, height, data } = frame;
+  const pixelCount = width * height;
+  const gray = new Float32Array(pixelCount);
+  const backgroundMask = new Uint8Array(pixelCount);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const pixelIndex = i / 4;
+    if (personMask.data[i + 3] >= 128) continue;
+
+    backgroundMask[pixelIndex] = 1;
+    gray[pixelIndex] = grayscale(data[i], data[i + 1], data[i + 2]);
+  }
+
+  const edges = computeEdgeMap(gray, width, height);
+  const cellWidth = Math.ceil(width / GRID_SIZE);
+  const cellHeight = Math.ceil(height / GRID_SIZE);
+  const boxes: BackgroundObjectBox[] = [];
+
+  for (let cellY = 0; cellY < GRID_SIZE; cellY += 1) {
+    for (let cellX = 0; cellX < GRID_SIZE; cellX += 1) {
+      const startX = cellX * cellWidth;
+      const startY = cellY * cellHeight;
+      const endX = Math.min(startX + cellWidth, width);
+      const endY = Math.min(startY + cellHeight, height);
+
+      let cellBackgroundPixels = 0;
+      let cellEdgePixels = 0;
+      let cellVariance = 0;
+      let cellMotionPixels = 0;
+
+      for (let y = startY; y < endY; y += 1) {
+        for (let x = startX; x < endX; x += 1) {
+          const pixelIndex = y * width + x;
+          if (!backgroundMask[pixelIndex]) continue;
+
+          cellBackgroundPixels += 1;
+
+          if (edges[pixelIndex] > EDGE_THRESHOLD) {
+            cellEdgePixels += 1;
+          }
+
+          const i = pixelIndex * 4;
+          cellVariance +=
+            Math.abs(data[i] - data[i + 1]) +
+            Math.abs(data[i + 1] - data[i + 2]);
+
+          if (previousBackground && previousBackground[i + 3] > 0) {
+            const delta =
+              Math.abs(data[i] - previousBackground[i]) +
+              Math.abs(data[i + 1] - previousBackground[i + 1]) +
+              Math.abs(data[i + 2] - previousBackground[i + 2]);
+
+            if (delta > MOTION_THRESHOLD) {
+              cellMotionPixels += 1;
+            }
+          }
+        }
+      }
+
+      if (cellBackgroundPixels === 0) continue;
+
+      const edgeDensity = cellEdgePixels / cellBackgroundPixels;
+      const varianceScore = cellVariance / (cellBackgroundPixels * 255 * 2);
+      const motionDensity = cellMotionPixels / cellBackgroundPixels;
+
+      if (
+        edgeDensity > REGION_EDGE_DENSITY ||
+        varianceScore > 0.12 ||
+        motionDensity > 0.08
+      ) {
+        boxes.push({
+          x: startX,
+          y: startY,
+          width: endX - startX,
+          height: endY - startY,
+        });
+      }
+    }
+  }
+
+  return boxes;
+}
+
+export function drawBackgroundObjectBoxes(
+  ctx: CanvasRenderingContext2D,
+  boxes: BackgroundObjectBox[],
+) {
+  ctx.strokeStyle = "#ff0000";
+  ctx.lineWidth = 3;
+
+  for (const box of boxes) {
+    ctx.strokeRect(box.x, box.y, box.width, box.height);
+  }
+}
+
+export function drawPersonLayerOnTop(
+  ctx: CanvasRenderingContext2D,
+  frame: ImageData,
+  personMask: ImageData,
+) {
+  const canvasData = ctx.getImageData(0, 0, frame.width, frame.height);
+
+  for (let i = 0; i < frame.data.length; i += 4) {
+    if (personMask.data[i + 3] >= 128) {
+      canvasData.data[i] = frame.data[i];
+      canvasData.data[i + 1] = frame.data[i + 1];
+      canvasData.data[i + 2] = frame.data[i + 2];
+      canvasData.data[i + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(canvasData, 0, 0);
 }
 
 export function buildBackgroundSnapshot(
