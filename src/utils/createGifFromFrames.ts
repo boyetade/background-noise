@@ -24,27 +24,28 @@ function imageDataToDataUrl(
   return canvas.toDataURL("image/png");
 }
 
-export function createGifFromFrames(
-  frames: ImageData[],
+function createGifFromImages(
+  images: string[],
+  gifWidth: number,
+  gifHeight: number,
   onProgress?: (progress: number) => void,
 ): Promise<string> {
-  if (frames.length === 0) {
+  if (images.length === 0) {
     return Promise.reject(new Error("No frames available to create a GIF"));
   }
 
   if (!gifshot.isSupported() || !gifshot.isExistingImagesGIFSupported()) {
-    return Promise.reject(new Error("GIF creation is not supported in this browser"));
+    return Promise.reject(
+      new Error("GIF creation is not supported in this browser"),
+    );
   }
-
-  const firstFrame = frames[0];
-  const images = frames.map((frame) => imageDataToDataUrl(frame));
 
   return new Promise((resolve, reject) => {
     gifshot.createGIF(
       {
         images,
-        gifWidth: firstFrame.width,
-        gifHeight: firstFrame.height,
+        gifWidth,
+        gifHeight,
         frameDuration: FRAME_DURATION,
         numWorkers: 2,
         progressCallback: onProgress ?? (() => {}),
@@ -59,4 +60,28 @@ export function createGifFromFrames(
       },
     );
   });
+}
+
+export function createGifFromFrames(
+  frames: ImageData[],
+  onProgress?: (progress: number) => void,
+): Promise<string> {
+  const firstFrame = frames[0];
+  const images = frames.map((frame) => imageDataToDataUrl(frame));
+
+  return createGifFromImages(
+    images,
+    firstFrame.width,
+    firstFrame.height,
+    onProgress,
+  );
+}
+
+export function createGifFromDataUrls(
+  images: string[],
+  gifWidth: number,
+  gifHeight: number,
+  onProgress?: (progress: number) => void,
+): Promise<string> {
+  return createGifFromImages(images, gifWidth, gifHeight, onProgress);
 }

@@ -10,9 +10,10 @@ function traceStarPath(
   points: number,
   innerRadius: number,
   outerRadius: number,
+  rotationRadians = 0,
 ) {
   const step = Math.PI / points;
-  let rotation = -Math.PI / 2;
+  let rotation = -Math.PI / 2 + rotationRadians;
 
   ctx.moveTo(
     centerX + outerRadius * Math.cos(rotation),
@@ -38,6 +39,7 @@ function traceStarPath(
 function cropCanvasToStar(
   sourceCanvas: HTMLCanvasElement,
   outputSize: number,
+  rotationRadians = 0,
 ): string {
   const outputCanvas = document.createElement("canvas");
   outputCanvas.width = outputSize;
@@ -59,6 +61,7 @@ function cropCanvasToStar(
     STAR_POINTS,
     innerRadius,
     outerRadius,
+    rotationRadians,
   );
   ctx.clip();
   ctx.drawImage(sourceCanvas, 0, 0, outputSize, outputSize);
@@ -105,6 +108,7 @@ export function cropVideoFrameToStar(
 export function cropImageDataToStar(
   imageData: ImageData,
   outputSize = 300,
+  rotationRadians = 0,
 ): string {
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = imageData.width;
@@ -128,7 +132,7 @@ export function cropImageDataToStar(
 
   scaledCtx.drawImage(sourceCanvas, 0, 0, outputSize, outputSize);
 
-  return cropCanvasToStar(scaledCanvas, outputSize);
+  return cropCanvasToStar(scaledCanvas, outputSize, rotationRadians);
 }
 
 export function createStarPreviewTexture(dataUrl: string): Texture {
