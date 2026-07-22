@@ -12,6 +12,7 @@
   "dependencies": {
     "@pixi/react": "^8.0.5",
     "@tensorflow-models/body-segmentation": "^1.0.2",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
     "@tensorflow/tfjs": "^4.22.0",
     "gifshot": "^0.4.5",
     "pixi.js": "^8.19.0",

@@ -1,6 +1,6 @@
+import { FACE_REGION_LABELS, type FaceRegion } from "../utils/faceZoom";
 import {
   FRAMES_PER_STAR,
-  STAR_COUNT,
   STAR_OUTPUT_SIZE,
 } from "../utils/starGifs";
 
@@ -9,6 +9,7 @@ const FRAME_GAP = 16;
 type StarProps = {
   hasRecording: boolean;
   starGifUrls: (string | null)[];
+  faceRegions: FaceRegion[];
   isCreatingGifs: boolean;
   captureError: string | null;
 };
@@ -16,6 +17,7 @@ type StarProps = {
 export const Star = ({
   hasRecording,
   starGifUrls,
+  faceRegions,
   isCreatingGifs,
   captureError,
 }: StarProps) => {
@@ -24,13 +26,13 @@ export const Star = ({
   return (
     <div>
       <p>
-        Star crop GIFs ({FRAMES_PER_STAR} frames each from your{" "}
-        {FRAMES_PER_STAR * STAR_COUNT} captured frames)
+        Star crop GIFs ({FRAMES_PER_STAR} frames each: 1–5, 6–10, 11–15)
       </p>
 
       {!hasRecording && (
         <p style={{ color: "#6b7280" }}>
-          Record a video to see star-shaped GIF previews.
+          Record a video to see star-shaped GIF previews — each star shows a
+          different part of your face.
         </p>
       )}
 
@@ -41,7 +43,7 @@ export const Star = ({
       {hasRecording && !isCreatingGifs && createdGifCount > 0 && (
         <p style={{ color: "#6b7280" }}>
           Showing {createdGifCount} star GIF
-          {createdGifCount === 1 ? "" : "s"} from your recording.
+          {createdGifCount === 1 ? "" : "s"}, one per face region.
         </p>
       )}
 
@@ -56,43 +58,54 @@ export const Star = ({
             flexWrap: "wrap",
           }}
         >
-          {starGifUrls.map((gifUrl, index) => (
-            <div
-              key={index}
-              style={{
-                width: STAR_OUTPUT_SIZE,
-                textAlign: "center",
-              }}
-            >
-              {gifUrl ? (
-                <img
-                  src={gifUrl}
-                  alt={`Star crop GIF ${index + 1}`}
-                  width={STAR_OUTPUT_SIZE}
-                  height={STAR_OUTPUT_SIZE}
-                  style={{ display: "block" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: STAR_OUTPUT_SIZE,
-                    height: STAR_OUTPUT_SIZE,
-                    border: "1px dashed #d1d5db",
-                    background: "#f9fafb",
-                  }}
-                />
-              )}
-              <p
+          {starGifUrls.map((gifUrl, index) => {
+            const frameStart = index * FRAMES_PER_STAR + 1;
+            const frameEnd = (index + 1) * FRAMES_PER_STAR;
+            const regionLabel = faceRegions[index]
+              ? FACE_REGION_LABELS[faceRegions[index]]
+              : null;
+
+            return (
+              <div
+                key={index}
                 style={{
-                  fontSize: "0.875rem",
-                  color: "#6b7280",
-                  margin: "0.25rem 0 0",
+                  width: STAR_OUTPUT_SIZE,
+                  textAlign: "center",
                 }}
               >
-                Star {index + 1}
-              </p>
-            </div>
-          ))}
+                {gifUrl ? (
+                  <img
+                    src={gifUrl}
+                    alt={`Star crop GIF ${index + 1}`}
+                    width={STAR_OUTPUT_SIZE}
+                    height={STAR_OUTPUT_SIZE}
+                    style={{ display: "block" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: STAR_OUTPUT_SIZE,
+                      height: STAR_OUTPUT_SIZE,
+                      border: "1px dashed #d1d5db",
+                      background: "#f9fafb",
+                    }}
+                  />
+                )}
+                <p
+                  style={{
+                    fontSize: "0.875rem",
+                    color: "#6b7280",
+                    margin: "0.25rem 0 0",
+                  }}
+                >
+                  Star {index + 1}
+                  {regionLabel
+                    ? ` · ${regionLabel} (frames ${frameStart}-${frameEnd})`
+                    : ""}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

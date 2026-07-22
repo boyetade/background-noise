@@ -6,7 +6,7 @@ import { Star } from "./Components/Star";
 import {
   STAR_COUNT,
   buildStarGifUrls,
-  createStarRecordingResult,
+  type StarRecordingResult,
 } from "./utils/starGifs";
 
 function App() {
@@ -16,6 +16,9 @@ function App() {
   const [starGifUrls, setStarGifUrls] = useState<(string | null)[]>(
     Array.from({ length: STAR_COUNT }, () => null),
   );
+  const [starFaceRegions, setStarFaceRegions] = useState<
+    StarRecordingResult["faceRegions"]
+  >([]);
   const [isCreatingStarGifs, setIsCreatingStarGifs] = useState(false);
   const [starGifError, setStarGifError] = useState<string | null>(null);
 
@@ -38,13 +41,14 @@ function App() {
   const handleRecordingStart = () => {
     setHasRecording(false);
     setStarGifUrls(Array.from({ length: STAR_COUNT }, () => null));
+    setStarFaceRegions([]);
     setStarGifError(null);
     setIsCreatingStarGifs(false);
   };
 
-  const handleRecordingComplete = (frames: ImageData[]) => {
-    const recordingResult = createStarRecordingResult(frames);
+  const handleRecordingComplete = (recordingResult: StarRecordingResult) => {
     setHasRecording(true);
+    setStarFaceRegions(recordingResult.faceRegions);
     setIsCreatingStarGifs(true);
     setStarGifError(null);
     setStarGifUrls(Array.from({ length: STAR_COUNT }, () => null));
@@ -93,6 +97,7 @@ function App() {
       <Star
         hasRecording={hasRecording}
         starGifUrls={starGifUrls}
+        faceRegions={starFaceRegions}
         isCreatingGifs={isCreatingStarGifs}
         captureError={starGifError}
       />

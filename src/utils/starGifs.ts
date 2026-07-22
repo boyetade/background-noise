@@ -1,3 +1,4 @@
+import type { FaceRegion } from "./faceZoom";
 import { createGifFromDataUrls } from "./createGifFromFrames";
 import { cropImageDataToStar } from "./starCrop";
 
@@ -7,7 +8,8 @@ export const STAR_OUTPUT_SIZE = 300;
 
 export type StarRecordingResult = {
   frames: ImageData[];
-  rotations: number[];
+  faceRegions: FaceRegion[];
+  starRotations: number[];
 };
 
 function splitFramesAcrossStars(frames: ImageData[]): ImageData[][] {
@@ -17,6 +19,20 @@ function splitFramesAcrossStars(frames: ImageData[]): ImageData[][] {
       starIndex * FRAMES_PER_STAR + FRAMES_PER_STAR,
     ),
   );
+}
+
+export function createStarRecordingResult(
+  frames: ImageData[],
+  faceRegions: FaceRegion[],
+): StarRecordingResult {
+  return {
+    frames,
+    faceRegions: faceRegions.slice(0, STAR_COUNT),
+    starRotations: Array.from(
+      { length: STAR_COUNT },
+      () => Math.random() * Math.PI * 2,
+    ),
+  };
 }
 
 export async function buildStarGifUrls(
@@ -34,7 +50,7 @@ export async function buildStarGifUrls(
         cropImageDataToStar(
           frame,
           STAR_OUTPUT_SIZE,
-          recordingResult.rotations[starIndex] ?? 0,
+          recordingResult.starRotations[starIndex] ?? 0,
         ),
       );
 
@@ -45,16 +61,4 @@ export async function buildStarGifUrls(
       );
     }),
   );
-}
-
-export function createStarRecordingResult(
-  frames: ImageData[],
-): StarRecordingResult {
-  return {
-    frames,
-    rotations: Array.from(
-      { length: STAR_COUNT },
-      () => Math.random() * Math.PI * 2,
-    ),
-  };
 }

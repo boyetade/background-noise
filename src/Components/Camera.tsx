@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import Webcam from "react-webcam";
 import * as bodySegmentation from "@tensorflow-models/body-segmentation";
+import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
+import {
+  drawZoomedRegion,
+  FACE_REGION_LABELS,
+  getFaceRegionRect,
+  pickDistinctFaceRegions,
+  type FaceRegion,
+} from "../utils/faceZoom";
 import { drawPersonCutoutOnTop } from "../utils/personCutout";
 import { createAlignedPersonMask } from "../utils/segmentationMask";
 import { createGifFromFrames } from "../utils/createGifFromFrames";
+import {
+  FRAMES_PER_STAR,
+  STAR_COUNT,
+  type StarRecordingResult,
+} from "../utils/starGifs";
 
 function syncCanvasSize(
   canvas: HTMLCanvasElement,
@@ -50,7 +63,7 @@ type CameraProps = {
   webcamRef: RefObject<Webcam | null>;
   isWebcamReady: boolean;
   onRecordingStart?: () => void;
-  onRecordingComplete?: (frames: ImageData[]) => void;
+  onRecordingComplete?: (result: StarRecordingResult) => void;
 };
 
 export const Camera = ({
@@ -60,7 +73,15 @@ export const Camera = ({
   onRecordingComplete,
 }: CameraProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const recordingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isRecordingRef = useRef(false);
   const segmenterRef = useRef<bodySegmentation.BodySegmenter | null>(null);
+  const faceDetectorRef =
+    useRef<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
+  const focusedFaceRegionRef = useRef<FaceRegion | null>(null);
+  const faceRegionsByBlockRef = useRef<FaceRegion[]>([]);
+  const lastDisplayedBlockRef = useRef(-1);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<number | null>(null);
@@ -68,6 +89,13 @@ export const Camera = ({
   const videoFramesRef = useRef<ImageData[]>([]);
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [personDetected, setPersonDetected] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [focusedFaceRegion, setFocusedFaceRegion] = useState<FaceRegion | null>(
+    null,
+  );
+  const [plannedFaceRegions, setPlannedFaceRegions] = useState<FaceRegion[]>(
+    [],
+  );
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTimeLeftMs, setRecordingTimeLeftMs] =
     useState(MAX_RECORDING_MS);
@@ -123,16 +151,24 @@ export const Camera = ({
   };
 
   const startRecording = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || isRecording || isModelLoading) return;
+    const recordingCanvas = recordingCanvasRef.current;
+    if (!recordingCanvas || isRecording || isModelLoading) return;
 
     videoFramesRef.current = [];
     setCapturedFrameCount(0);
     setGifUrl(null);
     setGifError(null);
+
+    const faceRegions = pickDistinctFaceRegions(STAR_COUNT);
+    faceRegionsByBlockRef.current = faceRegions;
+    setPlannedFaceRegions(faceRegions);
+    focusedFaceRegionRef.current = faceRegions[0] ?? null;
+    setFocusedFaceRegion(faceRegions[0] ?? null);
+    lastDisplayedBlockRef.current = 0;
+
     onRecordingStart?.();
 
-    const stream = canvas.captureStream(RECORDING_FPS);
+    const stream = recordingCanvas.captureStream(RECORDING_FPS);
     const mimeType = getSupportedMimeType();
     recordedChunksRef.current = [];
 
@@ -157,15 +193,23 @@ export const Camera = ({
         return url;
       });
 
+      isRecordingRef.current = false;
       setIsRecording(false);
       setRecordingTimeLeftMs(MAX_RECORDING_MS);
       mediaRecorderRef.current = null;
 
-      onRecordingComplete?.(videoFramesRef.current);
+      onRecordingComplete?.({
+        frames: videoFramesRef.current,
+        faceRegions: faceRegionsByBlockRef.current,
+        starRotations: faceRegionsByBlockRef.current.map(
+          () => Math.random() * Math.PI * 2,
+        ),
+      });
       void buildGifFromCapturedFrames();
     };
 
     mediaRecorderRef.current = recorder;
+    isRecordingRef.current = true;
     setIsRecording(true);
     setRecordingTimeLeftMs(MAX_RECORDING_MS);
     recorder.start(200);
@@ -201,12 +245,25 @@ export const Camera = ({
         },
       );
 
+      const faceDetector = await faceLandmarksDetection.createDetector(
+        faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
+        {
+          runtime: "tfjs",
+          refineLandmarks: true,
+          maxFaces: 1,
+        },
+      );
+
       if (cancelled) {
         segmenter.dispose();
+        await faceDetector.dispose();
         return;
       }
 
       segmenterRef.current = segmenter;
+      faceDetectorRef.current = faceDetector;
+      offscreenCanvasRef.current = document.createElement("canvas");
+      recordingCanvasRef.current = document.createElement("canvas");
       setIsModelLoading(false);
 
       const processFrame = async () => {
@@ -214,12 +271,18 @@ export const Camera = ({
 
         const video = webcamRef.current?.video;
         const canvas = canvasRef.current;
+        const offscreenCanvas = offscreenCanvasRef.current;
+        const recordingCanvas = recordingCanvasRef.current;
         const segmenter = segmenterRef.current;
+        const faceDetector = faceDetectorRef.current;
 
         if (
           !video ||
           !canvas ||
+          !offscreenCanvas ||
+          !recordingCanvas ||
           !segmenter ||
+          !faceDetector ||
           !isWebcamReady ||
           video.readyState < video.HAVE_ENOUGH_DATA
         ) {
@@ -230,18 +293,43 @@ export const Camera = ({
 
         try {
           syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
+          syncCanvasSize(
+            offscreenCanvas,
+            video.videoWidth,
+            video.videoHeight,
+          );
 
+          syncCanvasSize(
+            recordingCanvas,
+            video.videoWidth,
+            video.videoHeight,
+          );
+
+          const offscreenCtx = offscreenCanvas.getContext("2d", {
+            willReadFrequently: true,
+          });
           const ctx = canvas.getContext("2d", { willReadFrequently: true });
-          if (!ctx) return;
+          if (!offscreenCtx || !ctx) return;
 
-          ctx.save();
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          ctx.restore();
+          offscreenCtx.save();
+          offscreenCtx.translate(offscreenCanvas.width, 0);
+          offscreenCtx.scale(-1, 1);
+          offscreenCtx.drawImage(
+            video,
+            0,
+            0,
+            offscreenCanvas.width,
+            offscreenCanvas.height,
+          );
+          offscreenCtx.restore();
 
-          const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const segmentations = await segmenter.segmentPeople(canvas, {
+          const frame = offscreenCtx.getImageData(
+            0,
+            0,
+            offscreenCanvas.width,
+            offscreenCanvas.height,
+          );
+          const segmentations = await segmenter.segmentPeople(offscreenCanvas, {
             flipHorizontal: false,
             multiSegmentation: false,
             segmentBodyParts: false,
@@ -251,12 +339,62 @@ export const Camera = ({
 
           const personMask = await createAlignedPersonMask(
             segmentations,
-            canvas.width,
-            canvas.height,
+            offscreenCanvas.width,
+            offscreenCanvas.height,
           );
 
-          const hasPerson = drawPersonCutoutOnTop(ctx, frame, personMask);
+          const hasPerson = drawPersonCutoutOnTop(
+            offscreenCtx,
+            frame,
+            personMask,
+          );
           setPersonDetected(hasPerson);
+
+          const faces = await faceDetector.estimateFaces(offscreenCanvas, {
+            flipHorizontal: false,
+          });
+
+          setFaceDetected(faces.length > 0);
+          ctx.drawImage(offscreenCanvas, 0, 0);
+
+          if (isRecordingRef.current) {
+            const recordingCtx = recordingCanvas.getContext("2d", {
+              willReadFrequently: true,
+            });
+            if (!recordingCtx) return;
+
+            const capturedCount = videoFramesRef.current.length;
+            const block = Math.min(
+              Math.floor(capturedCount / FRAMES_PER_STAR),
+              Math.max(faceRegionsByBlockRef.current.length - 1, 0),
+            );
+            const blockRegion = faceRegionsByBlockRef.current[block];
+
+            if (blockRegion) {
+              focusedFaceRegionRef.current = blockRegion;
+
+              if (block !== lastDisplayedBlockRef.current) {
+                lastDisplayedBlockRef.current = block;
+                setFocusedFaceRegion(blockRegion);
+              }
+            }
+
+            if (faces.length > 0 && focusedFaceRegionRef.current) {
+              const regionRect = getFaceRegionRect(
+                faces[0],
+                focusedFaceRegionRef.current,
+              );
+              drawZoomedRegion(
+                recordingCtx,
+                offscreenCanvas,
+                offscreenCanvas.width,
+                offscreenCanvas.height,
+                regionRect,
+              );
+            } else {
+              recordingCtx.drawImage(offscreenCanvas, 0, 0);
+            }
+          }
         } finally {
           isProcessing = false;
         }
@@ -292,6 +430,11 @@ export const Camera = ({
       segmenterRef.current?.dispose();
       segmenterRef.current = null;
 
+      void faceDetectorRef.current?.dispose();
+      faceDetectorRef.current = null;
+      offscreenCanvasRef.current = null;
+      recordingCanvasRef.current = null;
+
       setRecordedVideoUrl((previousUrl) => {
         if (previousUrl) {
           URL.revokeObjectURL(previousUrl);
@@ -303,20 +446,24 @@ export const Camera = ({
   }, [isWebcamReady, webcamRef]);
 
   useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  useEffect(() => {
     if (!isRecording) return;
 
     const captureFrame = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) {
+      const recordingCanvas = recordingCanvasRef.current;
+      if (!recordingCanvas) {
         return;
       }
-
-      const frame = captureCanvasFrame(canvas);
-      if (!frame) return;
 
       if (videoFramesRef.current.length >= MAX_FRAMES) {
         return;
       }
+
+      const frame = captureCanvasFrame(recordingCanvas);
+      if (!frame) return;
 
       videoFramesRef.current.push(frame);
       setCapturedFrameCount(videoFramesRef.current.length);
@@ -338,7 +485,9 @@ export const Camera = ({
 
   return (
     <div>
-      {isModelLoading && <p>Loading person detection model...</p>}
+      {isModelLoading && (
+        <p>Loading person and face detection models...</p>
+      )}
 
       <div>
         <p>Camera</p>
@@ -347,6 +496,11 @@ export const Camera = ({
           {personDetected
             ? "Person detected · cutout active (black & white)"
             : "No person detected"}
+        </p>
+        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+          {faceDetected
+            ? "Face detected · zoom will apply to recorded video only"
+            : "No face detected"}
         </p>
       </div>
 
@@ -362,6 +516,39 @@ export const Camera = ({
         {isRecording && (
           <p style={{ marginTop: "0.75rem" }}>
             Recording: {recordingSecondsLeft}s remaining (max 8 seconds)
+          </p>
+        )}
+
+        {isRecording && focusedFaceRegion && (
+          <p style={{ marginTop: "0.75rem", color: "#6b7280" }}>
+            Filming: {FACE_REGION_LABELS[focusedFaceRegion]} (frames{" "}
+            {Math.floor(capturedFrameCount / FRAMES_PER_STAR) * FRAMES_PER_STAR +
+              1}
+            –
+            {Math.min(
+              (Math.floor(capturedFrameCount / FRAMES_PER_STAR) + 1) *
+                FRAMES_PER_STAR,
+              MAX_FRAMES,
+            )}
+            )
+          </p>
+        )}
+
+        {isRecording && plannedFaceRegions.length > 0 && (
+          <p
+            style={{
+              fontSize: "0.875rem",
+              color: "#6b7280",
+              marginTop: "0.5rem",
+            }}
+          >
+            Star plan:{" "}
+            {plannedFaceRegions
+              .map(
+                (region, index) =>
+                  `Star ${index + 1} (${index * FRAMES_PER_STAR + 1}-${(index + 1) * FRAMES_PER_STAR}) → ${FACE_REGION_LABELS[region]}`,
+              )
+              .join(" · ")}
           </p>
         )}
 
