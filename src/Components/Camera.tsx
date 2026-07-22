@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import Webcam from "react-webcam";
 import * as bodySegmentation from "@tensorflow-models/body-segmentation";
 import * as tf from "@tensorflow/tfjs";
@@ -35,25 +35,31 @@ function getSupportedMimeType(): string {
   );
 }
 
-function captureVideoFrame(video: HTMLVideoElement): ImageData | null {
-  if (video.videoWidth === 0 || video.videoHeight === 0) {
+function captureCanvasFrame(canvas: HTMLCanvasElement): ImageData | null {
+  if (canvas.width === 0 || canvas.height === 0) {
     return null;
   }
 
-  const captureCanvas = document.createElement("canvas");
-  captureCanvas.width = video.videoWidth;
-  captureCanvas.height = video.videoHeight;
-
-  const ctx = captureCanvas.getContext("2d", { willReadFrequently: true });
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) return null;
 
-  ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-  return ctx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-export const Camera = () => {
+type CameraProps = {
+  webcamRef: RefObject<Webcam | null>;
+  isWebcamReady: boolean;
+  onRecordingStart?: () => void;
+  onRecordingComplete?: (frames: ImageData[]) => void;
+};
+
+export const Camera = ({
+  webcamRef,
+  isWebcamReady,
+  onRecordingStart,
+  onRecordingComplete,
+}: CameraProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const webcamRef = useRef<Webcam>(null);
   const segmenterRef = useRef<bodySegmentation.BodySegmenter | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -124,6 +130,7 @@ export const Camera = () => {
     setCapturedFrameCount(0);
     setGifUrl(null);
     setGifError(null);
+    onRecordingStart?.();
 
     const stream = canvas.captureStream(RECORDING_FPS);
     const mimeType = getSupportedMimeType();
@@ -154,6 +161,7 @@ export const Camera = () => {
       setRecordingTimeLeftMs(MAX_RECORDING_MS);
       mediaRecorderRef.current = null;
 
+      onRecordingComplete?.(videoFramesRef.current);
       void buildGifFromCapturedFrames();
     };
 
@@ -212,6 +220,7 @@ export const Camera = () => {
           !video ||
           !canvas ||
           !segmenter ||
+          !isWebcamReady ||
           video.readyState < video.HAVE_ENOUGH_DATA
         ) {
           return;
@@ -291,18 +300,18 @@ export const Camera = () => {
       });
       setGifUrl(null);
     };
-  }, []);
+  }, [isWebcamReady, webcamRef]);
 
   useEffect(() => {
     if (!isRecording) return;
 
     const captureFrame = () => {
-      const video = webcamRef.current?.video;
-      if (!video || video.readyState < video.HAVE_ENOUGH_DATA) {
+      const canvas = canvasRef.current;
+      if (!canvas) {
         return;
       }
 
-      const frame = captureVideoFrame(video);
+      const frame = captureCanvasFrame(canvas);
       if (!frame) return;
 
       if (videoFramesRef.current.length >= MAX_FRAMES) {
@@ -409,16 +418,6 @@ export const Camera = () => {
           )}
         </div>
       </div>
-
-      <Webcam
-        ref={webcamRef}
-        audio={false}
-        screenshotFormat="image/jpeg"
-        screenshotQuality={0.9}
-        width={500}
-        height={500}
-        style={{ display: "none" }}
-      />
     </div>
   );
 };
