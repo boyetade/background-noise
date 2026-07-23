@@ -1,6 +1,7 @@
 import gifshot from "gifshot";
 
 const FRAME_DURATION = 5;
+const GIF_BACKGROUND_COLOR = "#ff0000";
 
 function imageDataToDataUrl(
   imageData: ImageData,
@@ -14,6 +15,9 @@ function imageDataToDataUrl(
   if (!ctx) {
     throw new Error("Could not get canvas context for GIF frame conversion");
   }
+
+  ctx.fillStyle = GIF_BACKGROUND_COLOR;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   if (flipHorizontal) {
     ctx.translate(canvas.width, 0);

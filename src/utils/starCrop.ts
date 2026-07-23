@@ -2,6 +2,7 @@ import { Texture } from "pixi.js";
 
 const STAR_POINTS = 5;
 const STAR_INNER_RATIO = 0.5;
+const STAR_GIF_BACKGROUND = "#ff0000";
 
 function traceStarPath(
   ctx: CanvasRenderingContext2D,
@@ -52,6 +53,9 @@ function cropCanvasToStar(
 
   const outerRadius = outputSize / 2;
   const innerRadius = outerRadius * STAR_INNER_RATIO;
+
+  ctx.fillStyle = STAR_GIF_BACKGROUND;
+  ctx.fillRect(0, 0, outputSize, outputSize);
 
   ctx.beginPath();
   traceStarPath(

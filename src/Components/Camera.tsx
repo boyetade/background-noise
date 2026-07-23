@@ -17,6 +17,7 @@ import { createGifFromFrames } from "../utils/createGifFromFrames";
 import {
   FRAMES_PER_STAR,
   STAR_COUNT,
+  STAR_FRAME_SLICES,
   type StarRecordingResult,
 } from "../utils/starGifs";
 
@@ -293,17 +294,9 @@ export const Camera = ({
 
         try {
           syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
-          syncCanvasSize(
-            offscreenCanvas,
-            video.videoWidth,
-            video.videoHeight,
-          );
+          syncCanvasSize(offscreenCanvas, video.videoWidth, video.videoHeight);
 
-          syncCanvasSize(
-            recordingCanvas,
-            video.videoWidth,
-            video.videoHeight,
-          );
+          syncCanvasSize(recordingCanvas, video.videoWidth, video.videoHeight);
 
           const offscreenCtx = offscreenCanvas.getContext("2d", {
             willReadFrequently: true,
@@ -322,6 +315,12 @@ export const Camera = ({
             offscreenCanvas.height,
           );
           offscreenCtx.restore();
+
+          ctx.save();
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.restore();
 
           const frame = offscreenCtx.getImageData(
             0,
@@ -343,19 +342,17 @@ export const Camera = ({
             offscreenCanvas.height,
           );
 
+          const faces = await faceDetector.estimateFaces(offscreenCanvas, {
+            flipHorizontal: false,
+          });
+
           const hasPerson = drawPersonCutoutOnTop(
             offscreenCtx,
             frame,
             personMask,
           );
           setPersonDetected(hasPerson);
-
-          const faces = await faceDetector.estimateFaces(offscreenCanvas, {
-            flipHorizontal: false,
-          });
-
           setFaceDetected(faces.length > 0);
-          ctx.drawImage(offscreenCanvas, 0, 0);
 
           if (isRecordingRef.current) {
             const recordingCtx = recordingCanvas.getContext("2d", {
@@ -485,16 +482,14 @@ export const Camera = ({
 
   return (
     <div>
-      {isModelLoading && (
-        <p>Loading person and face detection models...</p>
-      )}
+      {isModelLoading && <p>Loading person and face detection models...</p>}
 
       <div>
         <p>Camera</p>
         <canvas ref={canvasRef} width={500} height={500} />
         <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
           {personDetected
-            ? "Person detected · cutout active (black & white)"
+            ? "Person detected · B&W cutout applies to recorded video only"
             : "No person detected"}
         </p>
         <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
@@ -522,7 +517,8 @@ export const Camera = ({
         {isRecording && focusedFaceRegion && (
           <p style={{ marginTop: "0.75rem", color: "#6b7280" }}>
             Filming: {FACE_REGION_LABELS[focusedFaceRegion]} (frames{" "}
-            {Math.floor(capturedFrameCount / FRAMES_PER_STAR) * FRAMES_PER_STAR +
+            {Math.floor(capturedFrameCount / FRAMES_PER_STAR) *
+              FRAMES_PER_STAR +
               1}
             –
             {Math.min(
@@ -546,7 +542,7 @@ export const Camera = ({
             {plannedFaceRegions
               .map(
                 (region, index) =>
-                  `Star ${index + 1} (${index * FRAMES_PER_STAR + 1}-${(index + 1) * FRAMES_PER_STAR}) → ${FACE_REGION_LABELS[region]}`,
+                  `Star ${index + 1} (${STAR_FRAME_SLICES[index].frameStart}-${STAR_FRAME_SLICES[index].frameEnd}) → ${FACE_REGION_LABELS[region]}`,
               )
               .join(" · ")}
           </p>

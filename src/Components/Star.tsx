@@ -1,6 +1,6 @@
 import { FACE_REGION_LABELS, type FaceRegion } from "../utils/faceZoom";
 import {
-  FRAMES_PER_STAR,
+  STAR_FRAME_SLICES,
   STAR_OUTPUT_SIZE,
 } from "../utils/starGifs";
 
@@ -26,7 +26,7 @@ export const Star = ({
   return (
     <div>
       <p>
-        Star crop GIFs ({FRAMES_PER_STAR} frames each: 1–5, 6–10, 11–15)
+        Star crop GIFs (frames 2–5, 6–10, 11–15)
       </p>
 
       {!hasRecording && (
@@ -59,8 +59,7 @@ export const Star = ({
           }}
         >
           {starGifUrls.map((gifUrl, index) => {
-            const frameStart = index * FRAMES_PER_STAR + 1;
-            const frameEnd = (index + 1) * FRAMES_PER_STAR;
+            const { frameStart, frameEnd } = STAR_FRAME_SLICES[index];
             const regionLabel = faceRegions[index]
               ? FACE_REGION_LABELS[faceRegions[index]]
               : null;

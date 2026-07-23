@@ -6,6 +6,12 @@ export const STAR_COUNT = 3;
 export const FRAMES_PER_STAR = 5;
 export const STAR_OUTPUT_SIZE = 300;
 
+export const STAR_FRAME_SLICES = [
+  { frameStart: 2, frameEnd: 5, startIndex: 1, endIndex: 5 },
+  { frameStart: 6, frameEnd: 10, startIndex: 5, endIndex: 10 },
+  { frameStart: 11, frameEnd: 15, startIndex: 10, endIndex: 15 },
+] as const;
+
 export type StarRecordingResult = {
   frames: ImageData[];
   faceRegions: FaceRegion[];
@@ -13,11 +19,8 @@ export type StarRecordingResult = {
 };
 
 function splitFramesAcrossStars(frames: ImageData[]): ImageData[][] {
-  return Array.from({ length: STAR_COUNT }, (_, starIndex) =>
-    frames.slice(
-      starIndex * FRAMES_PER_STAR,
-      starIndex * FRAMES_PER_STAR + FRAMES_PER_STAR,
-    ),
+  return STAR_FRAME_SLICES.map(({ startIndex, endIndex }) =>
+    frames.slice(startIndex, endIndex),
   );
 }
 
