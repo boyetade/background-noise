@@ -7,12 +7,11 @@ import {
 } from "../utils/starGifs";
 
 const STAGE_BACKGROUND = "#73061a";
-const STAGE_ASPECT_RATIO = 4 / 3;
-const STAGE_PADDING_Y = 100;
-const STAGE_PADDING_X = 100;
+const STAGE_PADDING_Y = 40;
+const STAGE_PADDING_X = 10;
 const STAGE_WIDTH = 640;
-const STAGE_HEIGHT = STAGE_WIDTH / STAGE_ASPECT_RATIO;
-const MIN_STAR_SPACING = 10;
+const STAGE_HEIGHT = 300;
+const MIN_STAR_SPACING = 5;
 const MAX_PLACEMENT_ATTEMPTS = 500;
 
 type StarPosition = {
@@ -89,13 +88,17 @@ type StarProps = {
   captureError: string | null;
 };
 
-function createRandomStarPositions(): StarPosition[] {
-  const bounds: StarBounds = {
+function createPlacementBounds(): StarBounds {
+  return {
     minX: STAGE_PADDING_X,
     minY: STAGE_PADDING_Y,
     maxX: STAGE_WIDTH - STAGE_PADDING_X - STAR_OUTPUT_SIZE,
     maxY: STAGE_HEIGHT - STAGE_PADDING_Y - STAR_OUTPUT_SIZE,
   };
+}
+
+function createRandomStarPositions(): StarPosition[] {
+  const bounds = createPlacementBounds();
   const placed: StarPosition[] = [];
 
   for (let starIndex = 0; starIndex < STAR_COUNT; starIndex += 1) {
