@@ -1,4 +1,3 @@
-import "./App.css";
 import { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 import { Camera } from "./Components/Camera";
@@ -79,13 +78,7 @@ function App() {
         width={500}
         height={500}
         onUserMedia={() => setIsWebcamReady(true)}
-        style={{
-          position: "absolute",
-          width: 1,
-          height: 1,
-          opacity: 0,
-          pointerEvents: "none",
-        }}
+        className="pointer-events-none absolute h-px w-px opacity-0"
       />
 
       <Camera

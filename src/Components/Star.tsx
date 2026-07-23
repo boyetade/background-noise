@@ -6,7 +6,6 @@ import {
   STAR_OUTPUT_SIZE,
 } from "../utils/starGifs";
 
-const STAGE_BACKGROUND = "#73061a";
 const STAGE_PADDING_Y = 40;
 const STAGE_PADDING_X = 10;
 const STAGE_WIDTH = 640;
@@ -157,36 +156,30 @@ export const Star = ({
       <p>Star crop GIFs (frames 2–5, 6–10, 11–15)</p>
 
       {!hasRecording && (
-        <p style={{ color: "#6b7280" }}>
+        <p className="text-gray-500">
           Record a video to see star-shaped GIF previews — each star shows a
           different part of your face.
         </p>
       )}
 
       {hasRecording && isCreatingGifs && (
-        <p style={{ color: "#6b7280" }}>Creating star GIFs...</p>
+        <p className="text-gray-500">Creating star GIFs...</p>
       )}
 
       {hasRecording && !isCreatingGifs && createdGifCount > 0 && (
-        <p style={{ color: "#6b7280" }}>
+        <p className="text-gray-500">
           Showing {createdGifCount} star GIF
           {createdGifCount === 1 ? "" : "s"}, one per face region.
         </p>
       )}
 
-      {captureError && <p style={{ color: "#dc2626" }}>{captureError}</p>}
+      {captureError && <p className="text-red-600">{captureError}</p>}
 
       {hasRecording && (
-        <div style={{ marginTop: "0.5rem" }}>
+        <div className="mt-2">
           <div
-            style={{
-              position: "relative",
-              width: STAGE_WIDTH,
-              height: STAGE_HEIGHT,
-
-              backgroundColor: STAGE_BACKGROUND,
-              overflow: "hidden",
-            }}
+            className="relative overflow-hidden bg-stage"
+            style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
           >
             {starGifUrls.map((gifUrl, index) => {
               const position = starPositions[index];
@@ -197,8 +190,8 @@ export const Star = ({
               return (
                 <div
                   key={index}
+                  className="absolute"
                   style={{
-                    position: "absolute",
                     left: position.x,
                     top: position.y,
                     width: STAR_OUTPUT_SIZE,
@@ -211,15 +204,14 @@ export const Star = ({
                       alt={`Star crop GIF ${index + 1}`}
                       width={STAR_OUTPUT_SIZE}
                       height={STAR_OUTPUT_SIZE}
-                      style={{ display: "block" }}
+                      className="block"
                     />
                   ) : (
                     <div
+                      className="border border-dashed border-white/60 bg-black/10"
                       style={{
                         width: STAR_OUTPUT_SIZE,
                         height: STAR_OUTPUT_SIZE,
-                        border: "1px dashed rgba(255, 255, 255, 0.6)",
-                        background: "rgba(0, 0, 0, 0.08)",
                       }}
                     />
                   )}
@@ -229,13 +221,8 @@ export const Star = ({
           </div>
 
           <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.25rem",
-              width: STAGE_WIDTH,
-              marginTop: "0.5rem",
-            }}
+            className="mt-2 flex flex-col gap-1"
+            style={{ width: STAGE_WIDTH }}
           >
             {starGifUrls.map((_, index) => {
               const { frameStart, frameEnd } = STAR_FRAME_SLICES[index];
@@ -244,14 +231,7 @@ export const Star = ({
                 : null;
 
               return (
-                <p
-                  key={index}
-                  style={{
-                    fontSize: "0.875rem",
-                    color: "#6b7280",
-                    margin: 0,
-                  }}
-                >
+                <p key={index} className="m-0 text-sm text-gray-500">
                   Star {index + 1}
                   {regionLabel
                     ? ` · ${regionLabel} (frames ${frameStart}-${frameEnd})`

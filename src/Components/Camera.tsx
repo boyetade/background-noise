@@ -487,19 +487,19 @@ export const Camera = ({
       <div>
         <p>Camera</p>
         <canvas ref={canvasRef} width={500} height={500} />
-        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+        <p className="text-sm text-gray-500">
           {personDetected
             ? "Person detected · B&W cutout applies to recorded video only"
             : "No person detected"}
         </p>
-        <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>
+        <p className="text-sm text-gray-500">
           {faceDetected
             ? "Face detected · zoom will apply to recorded video only"
             : "No face detected"}
         </p>
       </div>
 
-      <div style={{ marginTop: "1rem" }}>
+      <div className="mt-4">
         <button
           type="button"
           onClick={startRecording}
@@ -509,13 +509,13 @@ export const Camera = ({
         </button>
 
         {isRecording && (
-          <p style={{ marginTop: "0.75rem" }}>
+          <p className="mt-3">
             Recording: {recordingSecondsLeft}s remaining (max 8 seconds)
           </p>
         )}
 
         {isRecording && focusedFaceRegion && (
-          <p style={{ marginTop: "0.75rem", color: "#6b7280" }}>
+          <p className="mt-3 text-gray-500">
             Filming: {FACE_REGION_LABELS[focusedFaceRegion]} (frames{" "}
             {Math.floor(capturedFrameCount / FRAMES_PER_STAR) *
               FRAMES_PER_STAR +
@@ -531,13 +531,7 @@ export const Camera = ({
         )}
 
         {isRecording && plannedFaceRegions.length > 0 && (
-          <p
-            style={{
-              fontSize: "0.875rem",
-              color: "#6b7280",
-              marginTop: "0.5rem",
-            }}
-          >
+          <p className="mt-2 text-sm text-gray-500">
             Star plan:{" "}
             {plannedFaceRegions
               .map(
@@ -548,22 +542,16 @@ export const Camera = ({
           </p>
         )}
 
-        <p
-          style={{
-            fontSize: "0.875rem",
-            color: "#6b7280",
-            marginTop: "0.75rem",
-          }}
-        >
+        <p className="mt-3 text-sm text-gray-500">
           Captured frames: {capturedFrameCount} / {MAX_FRAMES} (every 0.5s while
           recording)
         </p>
 
         {recordedVideoUrl && (
-          <div style={{ marginTop: "1rem" }}>
+          <div className="mt-4">
             <p>Recorded video</p>
             <video src={recordedVideoUrl} controls width={500} />
-            <p style={{ marginTop: "0.5rem" }}>
+            <p className="mt-2">
               <a href={recordedVideoUrl} download="camera-recording.webm">
                 Download video
               </a>
@@ -571,7 +559,7 @@ export const Camera = ({
           </div>
         )}
 
-        <div style={{ marginTop: "1rem" }}>
+        <div className="mt-4">
           <button
             type="button"
             onClick={() => void buildGifFromCapturedFrames()}
@@ -581,18 +569,18 @@ export const Camera = ({
           </button>
 
           {gifError && (
-            <p style={{ marginTop: "0.75rem", color: "#dc2626" }}>{gifError}</p>
+            <p className="mt-3 text-red-600">{gifError}</p>
           )}
 
           {gifUrl && (
-            <div style={{ marginTop: "1rem" }}>
+            <div className="mt-4">
               <p>Generated GIF</p>
               <img
                 src={gifUrl}
                 alt="Generated from captured frames"
                 width={500}
               />
-              <p style={{ marginTop: "0.5rem" }}>
+              <p className="mt-2">
                 <a href={gifUrl} download="camera-recording.gif">
                   Download GIF
                 </a>
