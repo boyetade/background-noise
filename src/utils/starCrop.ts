@@ -2,7 +2,7 @@ import { Texture } from "pixi.js";
 
 const STAR_POINTS = 5;
 const STAR_INNER_RATIO = 0.5;
-const STAR_GIF_BACKGROUND = "#ff0000";
+const STAR_GIF_BACKGROUND = "#73061a";
 
 function traceStarPath(
   ctx: CanvasRenderingContext2D,

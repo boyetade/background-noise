@@ -4,7 +4,7 @@ import { cropImageDataToStar } from "./starCrop";
 
 export const STAR_COUNT = 3;
 export const FRAMES_PER_STAR = 5;
-export const STAR_OUTPUT_SIZE = 300;
+export const STAR_OUTPUT_SIZE = 100;
 
 export const STAR_FRAME_SLICES = [
   { frameStart: 2, frameEnd: 5, startIndex: 1, endIndex: 5 },
