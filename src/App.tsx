@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 import { Camera } from "./Components/Camera";
+import { CameraControls } from "./Components/CameraControls";
+import { HandDrawnRectOutline } from "./Components/HandDrawnRectOutline";
+import { HandDrawnCircle } from "./Components/HandDrawnCircle";
 import { Star } from "./Components/Star";
+import { useCamera } from "./hooks/useCamera";
 import {
   STAR_COUNT,
   buildStarGifUrls,
   type StarRecordingResult,
 } from "./utils/starGifs";
+
+const CAMERA_FRAME_WIDTH = 900;
+const CAMERA_FRAME_HEIGHT = 600;
 
 function App() {
   const webcamRef = useRef<Webcam>(null);
@@ -66,27 +73,56 @@ function App() {
       });
   };
 
+  const camera = useCamera({
+    webcamRef,
+    isWebcamReady,
+    onRecordingStart: handleRecordingStart,
+    onRecordingComplete: handleRecordingComplete,
+  });
+
   return (
-    <div>
-      <h1>Hello World</h1>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4">
+      <div
+        className="relative overflow-visible"
+        style={{ width: CAMERA_FRAME_WIDTH, height: CAMERA_FRAME_HEIGHT }}
+      >
+        <HandDrawnRectOutline
+          width={CAMERA_FRAME_WIDTH}
+          height={CAMERA_FRAME_HEIGHT}
+          seed={1}
+        >
+          <Webcam
+            ref={webcamRef}
+            audio={false}
+            screenshotFormat="image/jpeg"
+            screenshotQuality={0.9}
+            width={500}
+            height={500}
+            onUserMedia={() => setIsWebcamReady(true)}
+            className="pointer-events-none absolute h-px w-px opacity-0"
+          />
 
-      <Webcam
-        ref={webcamRef}
-        audio={false}
-        screenshotFormat="image/jpeg"
-        screenshotQuality={0.9}
-        width={500}
-        height={500}
-        onUserMedia={() => setIsWebcamReady(true)}
-        className="pointer-events-none absolute h-px w-px opacity-0"
-      />
+          <Camera
+            canvasRef={camera.canvasRef}
+            isModelLoading={camera.isModelLoading}
+            className="h-full"
+            previewClassName="relative h-full min-h-0"
+          />
+        </HandDrawnRectOutline>
 
-      <Camera
-        webcamRef={webcamRef}
-        isWebcamReady={isWebcamReady}
-        onRecordingStart={handleRecordingStart}
-        onRecordingComplete={handleRecordingComplete}
-      />
+        <HandDrawnCircle
+          className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-[calc(50%-55px)]"
+          radius={26}
+          onClick={camera.controls.onStartRecording}
+          disabled={
+            camera.controls.isRecording || camera.controls.isModelLoading
+          }
+          isRecording={camera.controls.isRecording}
+        />
+      </div>
+
+      <CameraControls className="mt-4" {...camera.controls} />
+
       <Star
         hasRecording={hasRecording}
         starGifUrls={starGifUrls}

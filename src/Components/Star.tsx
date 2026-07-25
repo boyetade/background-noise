@@ -1,5 +1,7 @@
 import { useMemo } from "react";
+import { HandDrawnRectOutline } from "./HandDrawnRectOutline";
 import { FACE_REGION_LABELS, type FaceRegion } from "../utils/faceZoom";
+import { hashStringToSeed } from "../utils/handDrawnRect";
 import {
   STAR_COUNT,
   STAR_FRAME_SLICES,
@@ -151,6 +153,11 @@ export const Star = ({
     return createRandomStarPositions();
   }, [hasRecording, placementKey]);
 
+  const outlineSeed = useMemo(
+    () => hashStringToSeed(placementKey || "stage-outline"),
+    [placementKey],
+  );
+
   return (
     <div>
       <p>Star crop GIFs (frames 2–5, 6–10, 11–15)</p>
@@ -177,48 +184,52 @@ export const Star = ({
 
       {hasRecording && (
         <div className="mt-2">
-          <div
-            className="relative overflow-hidden bg-stage"
-            style={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+          <HandDrawnRectOutline
+            width={STAGE_WIDTH}
+            height={STAGE_HEIGHT}
+            seed={outlineSeed}
+            contentInset={0}
           >
-            {starGifUrls.map((gifUrl, index) => {
-              const position = starPositions[index];
-              if (!position) {
-                return null;
-              }
+            <div className="relative h-full w-full">
+              {starGifUrls.map((gifUrl, index) => {
+                const position = starPositions[index];
+                if (!position) {
+                  return null;
+                }
 
-              return (
-                <div
-                  key={index}
-                  className="absolute"
-                  style={{
-                    left: position.x,
-                    top: position.y,
-                    width: STAR_OUTPUT_SIZE,
-                    height: STAR_OUTPUT_SIZE,
-                  }}
-                >
-                  {gifUrl ? (
-                    <img
-                      src={gifUrl}
-                      alt={`Star crop GIF ${index + 1}`}
-                      width={STAR_OUTPUT_SIZE}
-                      height={STAR_OUTPUT_SIZE}
-                      className="block"
-                    />
-                  ) : (
-                    <div
-                      className="border border-dashed border-white/60 bg-black/10"
-                      style={{
-                        width: STAR_OUTPUT_SIZE,
-                        height: STAR_OUTPUT_SIZE,
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <div
+                    key={index}
+                    className="absolute"
+                    style={{
+                      left: position.x,
+                      top: position.y,
+                      width: STAR_OUTPUT_SIZE,
+                      height: STAR_OUTPUT_SIZE,
+                    }}
+                  >
+                    {gifUrl ? (
+                      <img
+                        src={gifUrl}
+                        alt={`Star crop GIF ${index + 1}`}
+                        width={STAR_OUTPUT_SIZE}
+                        height={STAR_OUTPUT_SIZE}
+                        className="block"
+                      />
+                    ) : (
+                      <div
+                        className="border border-dashed border-white/60 bg-black/10"
+                        style={{
+                          width: STAR_OUTPUT_SIZE,
+                          height: STAR_OUTPUT_SIZE,
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </HandDrawnRectOutline>
 
           <div
             className="mt-2 flex flex-col gap-1"
