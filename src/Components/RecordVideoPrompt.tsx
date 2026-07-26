@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { isQuentinFontReady, preloadFonts } from "../loadFonts";
 
 type RecordVideoPromptProps = {
   className?: string;
@@ -11,7 +13,27 @@ export function RecordVideoPrompt({
   style,
   hidden = false,
 }: RecordVideoPromptProps) {
-  if (hidden) {
+  const [isFontReady, setIsFontReady] = useState(isQuentinFontReady);
+
+  useEffect(() => {
+    if (isFontReady) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void preloadFonts().then(() => {
+      if (!cancelled) {
+        setIsFontReady(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFontReady]);
+
+  if (hidden || !isFontReady) {
     return null;
   }
 
