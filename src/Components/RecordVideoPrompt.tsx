@@ -17,7 +17,7 @@ export function RecordVideoPrompt({
 
   return (
     <p
-      className={`max-w-[12rem] -rotate-2 font-quentin text-2xl leading-tight text-neutral-800 ${className ?? ""}`}
+      className={`max-w-48 -rotate-2 font-quentin text-2xl leading-tight text-white ${className ?? ""}`}
       style={style}
     >
       Have 8 seconds of expression

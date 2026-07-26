@@ -10,10 +10,11 @@ import {
   type StarRecordingResult,
 } from "./utils/starGifs";
 import { CameraMask } from "./Components/CameraMask";
+import { AppBackground } from "./Components/AppBackground";
 import { RecordVideoPrompt } from "./Components/RecordVideoPrompt";
 
-const CAMERA_FRAME_WIDTH = 900;
-const CAMERA_FRAME_HEIGHT = 600;
+const CAMERA_FRAME_WIDTH = 750;
+const CAMERA_FRAME_HEIGHT = 500;
 const STAR_STAGE_WIDTH = CAMERA_FRAME_WIDTH;
 const STAR_STAGE_HEIGHT = 240;
 const RECORD_PROMPT_OFFSET = CAMERA_FRAME_WIDTH / 2;
@@ -72,69 +73,74 @@ function App() {
   });
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      {webcamError ? (
-        <p className="mb-4 text-sm text-red-700">{webcamError}</p>
-      ) : null}
-      <video
-        ref={attachVideoRef}
-        muted
-        playsInline
-        autoPlay
-        className="pointer-events-none fixed h-px w-px opacity-0"
-      />
-      <div className="relative flex w-full justify-center">
-        <div
-          className="relative overflow-visible"
-          style={{ width: CAMERA_FRAME_WIDTH, height: CAMERA_FRAME_HEIGHT }}
-        >
-          <CameraMask
-            className="h-full w-full"
-            width={CAMERA_FRAME_WIDTH}
-            height={CAMERA_FRAME_HEIGHT}
-            videoRef={videoRef}
-            canvasRef={camera.canvasRef}
-            isVideoReady={isWebcamReady}
-            isModelLoading={camera.isModelLoading}
+    <>
+      <AppBackground />
+      <div className="relative flex min-h-screen flex-col items-center justify-center px-4">
+        {webcamError ? (
+          <p className="mb-4 text-sm text-red-700">{webcamError}</p>
+        ) : null}
+        <video
+          ref={attachVideoRef}
+          muted
+          playsInline
+          autoPlay
+          className="pointer-events-none fixed h-px w-px opacity-0"
+        />
+        <div className="relative flex w-full justify-center">
+          <div
+            className="relative overflow-visible"
+            style={{ width: CAMERA_FRAME_WIDTH, height: CAMERA_FRAME_HEIGHT }}
           >
-            <Camera
+            <CameraMask
+              className="h-full w-full"
+              width={CAMERA_FRAME_WIDTH}
+              height={CAMERA_FRAME_HEIGHT}
+              videoRef={videoRef}
               canvasRef={camera.canvasRef}
+              isVideoReady={isWebcamReady}
               isModelLoading={camera.isModelLoading}
-              hideCanvas
-            />
-          </CameraMask>
+            >
+              <Camera
+                canvasRef={camera.canvasRef}
+                isModelLoading={camera.isModelLoading}
+                hideCanvas
+              />
+            </CameraMask>
 
-          <HandDrawnCircle
-            className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-[calc(50%-55px)]"
-            radius={26}
-            onClick={camera.controls.onStartRecording}
-            disabled={
+            <HandDrawnCircle
+              className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-[calc(50%-55px)]"
+              radius={26}
+              onClick={camera.controls.onStartRecording}
+              disabled={
+                camera.controls.isRecording || camera.controls.isModelLoading
+              }
+              isRecording={camera.controls.isRecording}
+            />
+          </div>
+
+          <RecordVideoPrompt
+            className="absolute top-1/2 -translate-y-1/2"
+            style={{ left: `calc(50% + ${RECORD_PROMPT_OFFSET}px + 2.5rem)` }}
+            hidden={
               camera.controls.isRecording || camera.controls.isModelLoading
             }
-            isRecording={camera.controls.isRecording}
           />
         </div>
 
-        <RecordVideoPrompt
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: `calc(50% + ${RECORD_PROMPT_OFFSET}px + 2.5rem)` }}
-          hidden={camera.controls.isRecording || camera.controls.isModelLoading}
+        {/* <CameraControls className="mt-4" {...camera.controls} /> */}
+
+        <Star
+          hasRecording={hasRecording}
+          starGifUrls={starGifUrls}
+          faceRegions={starFaceRegions}
+          isCreatingGifs={isCreatingStarGifs}
+          captureError={starGifError}
+          stageWidth={STAR_STAGE_WIDTH}
+          stageHeight={STAR_STAGE_HEIGHT}
+          stageColor={DEFAULT_STAGE_COLOR}
         />
       </div>
-
-      {/* <CameraControls className="mt-4" {...camera.controls} /> */}
-
-      <Star
-        hasRecording={hasRecording}
-        starGifUrls={starGifUrls}
-        faceRegions={starFaceRegions}
-        isCreatingGifs={isCreatingStarGifs}
-        captureError={starGifError}
-        stageWidth={STAR_STAGE_WIDTH}
-        stageHeight={STAR_STAGE_HEIGHT}
-        stageColor={DEFAULT_STAGE_COLOR}
-      />
-    </div>
+    </>
   );
 }
 

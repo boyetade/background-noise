@@ -1,11 +1,6 @@
 import "../pixi/setup";
 import { Application, useTick } from "@pixi/react";
-import {
-  useCallback,
-  useMemo,
-  type ReactNode,
-  type RefObject,
-} from "react";
+import { useCallback, useMemo, type ReactNode, type RefObject } from "react";
 import type { Graphics, Texture } from "pixi.js";
 import { useCanvasTexture } from "../hooks/useCanvasTexture";
 import { useVideoTexture } from "../hooks/useVideoTexture";
@@ -71,10 +66,7 @@ function getCoverScale(
     return 1;
   }
 
-  return Math.max(
-    viewWidth / texture.width,
-    viewHeight / texture.height,
-  );
+  return Math.max(viewWidth / texture.width, viewHeight / texture.height);
 }
 
 function FeedSprite({
@@ -116,8 +108,8 @@ export function CameraMask({
   canvasRef,
   isVideoReady,
   isModelLoading,
-  width = 900,
-  height = 650,
+  width = 700,
+  height = 550,
   seed = 11,
   fillColor = PAPER_MASK_FILL,
   strokeColor = "#c9bfb0",
