@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Camera } from "./Components/Camera";
-import { CameraControls } from "./Components/CameraControls";
 import { HandDrawnCircle } from "./Components/HandDrawnCircle";
-import { Star } from "./Components/Star";
+import { Star, DEFAULT_STAGE_COLOR } from "./Components/Star";
 import { useCamera } from "./hooks/useCamera";
 import { useWebcamStream } from "./hooks/useWebcamStream";
 import {
@@ -15,11 +14,17 @@ import { RecordVideoPrompt } from "./Components/RecordVideoPrompt";
 
 const CAMERA_FRAME_WIDTH = 900;
 const CAMERA_FRAME_HEIGHT = 600;
+const STAR_STAGE_WIDTH = CAMERA_FRAME_WIDTH;
+const STAR_STAGE_HEIGHT = 240;
 const RECORD_PROMPT_OFFSET = CAMERA_FRAME_WIDTH / 2;
 
 function App() {
-  const { videoRef, attachVideoRef, isReady: isWebcamReady, error: webcamError } =
-    useWebcamStream();
+  const {
+    videoRef,
+    attachVideoRef,
+    isReady: isWebcamReady,
+    error: webcamError,
+  } = useWebcamStream();
   const [hasRecording, setHasRecording] = useState(false);
   const [starGifUrls, setStarGifUrls] = useState<(string | null)[]>(
     Array.from({ length: STAR_COUNT }, () => null),
@@ -113,13 +118,11 @@ function App() {
         <RecordVideoPrompt
           className="absolute top-1/2 -translate-y-1/2"
           style={{ left: `calc(50% + ${RECORD_PROMPT_OFFSET}px + 2.5rem)` }}
-          hidden={
-            camera.controls.isRecording || camera.controls.isModelLoading
-          }
+          hidden={camera.controls.isRecording || camera.controls.isModelLoading}
         />
       </div>
 
-      <CameraControls className="mt-4" {...camera.controls} />
+      {/* <CameraControls className="mt-4" {...camera.controls} /> */}
 
       <Star
         hasRecording={hasRecording}
@@ -127,6 +130,9 @@ function App() {
         faceRegions={starFaceRegions}
         isCreatingGifs={isCreatingStarGifs}
         captureError={starGifError}
+        stageWidth={STAR_STAGE_WIDTH}
+        stageHeight={STAR_STAGE_HEIGHT}
+        stageColor={DEFAULT_STAGE_COLOR}
       />
     </div>
   );

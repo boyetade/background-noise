@@ -1,10 +1,6 @@
-import { FACE_REGION_LABELS, type FaceRegion } from "../utils/faceZoom";
-import { STAR_FRAME_SLICES } from "../utils/starGifs";
-
 type CameraControlsProps = {
   isRecording: boolean;
   recordingSecondsLeft: string;
-  plannedFaceRegions: FaceRegion[];
   capturedFrameCount: number;
   maxFrames: number;
   recordedVideoUrl: string | null;
@@ -15,16 +11,10 @@ type CameraControlsProps = {
   className?: string;
 };
 
-export function CameraControls({
-  isRecording,
-  recordingSecondsLeft,
-  plannedFaceRegions,
-
-  className,
-}: CameraControlsProps) {
+export function CameraControls({ className }: CameraControlsProps) {
   return (
     <div className={className}>
-      {isRecording && (
+      {/* {isRecording && (
         <p>Recording: {recordingSecondsLeft}s remaining (max 8 seconds)</p>
       )}
 
@@ -38,7 +28,7 @@ export function CameraControls({
             )
             .join(" · ")}
         </p>
-      )}
+      )} */}
 
       {/* <p className="mt-3 text-sm text-gray-500">
         Captured frames: {capturedFrameCount} / {maxFrames} (every 0.5s while

@@ -9,6 +9,13 @@
 }
 
 @theme {
+  --color-app: #2b48d9;
   --color-stage: #73061a;
   --font-quentin: "Quentin", cursive;
+}
+
+html,
+body {
+  min-height: 100%;
+  background-color: #2b48d9;
 }

@@ -1,15 +1,16 @@
-import { useMemo } from "react";
-import { FACE_REGION_LABELS, type FaceRegion } from "../utils/faceZoom";
-import {
-  STAR_COUNT,
-  STAR_FRAME_SLICES,
-  STAR_OUTPUT_SIZE,
-} from "../utils/starGifs";
+import "../pixi/setup";
+import { Application } from "@pixi/react";
+import { useCallback, useMemo } from "react";
+import type { Graphics } from "pixi.js";
+import { type FaceRegion } from "../utils/faceZoom";
+import { STAR_COUNT, STAR_OUTPUT_SIZE } from "../utils/starGifs";
+
+export const DEFAULT_STAGE_WIDTH = 800;
+export const DEFAULT_STAGE_HEIGHT = 200;
+export const DEFAULT_STAGE_COLOR = "#73061a";
 
 const STAGE_PADDING_Y = 40;
 const STAGE_PADDING_X = 10;
-const STAGE_WIDTH = 640;
-const STAGE_HEIGHT = 300;
 const MIN_STAR_SPACING = 5;
 const MAX_PLACEMENT_ATTEMPTS = 500;
 
@@ -85,19 +86,28 @@ type StarProps = {
   faceRegions: FaceRegion[];
   isCreatingGifs: boolean;
   captureError: string | null;
+  stageWidth?: number;
+  stageHeight?: number;
+  stageColor?: string | number;
 };
 
-function createPlacementBounds(): StarBounds {
+function createPlacementBounds(
+  stageWidth: number,
+  stageHeight: number,
+): StarBounds {
   return {
     minX: STAGE_PADDING_X,
     minY: STAGE_PADDING_Y,
-    maxX: STAGE_WIDTH - STAGE_PADDING_X - STAR_OUTPUT_SIZE,
-    maxY: STAGE_HEIGHT - STAGE_PADDING_Y - STAR_OUTPUT_SIZE,
+    maxX: stageWidth - STAGE_PADDING_X - STAR_OUTPUT_SIZE,
+    maxY: stageHeight - STAGE_PADDING_Y - STAR_OUTPUT_SIZE,
   };
 }
 
-function createRandomStarPositions(): StarPosition[] {
-  const bounds = createPlacementBounds();
+function createRandomStarPositions(
+  stageWidth: number,
+  stageHeight: number,
+): StarPosition[] {
+  const bounds = createPlacementBounds(stageWidth, stageHeight);
   const placed: StarPosition[] = [];
 
   for (let starIndex = 0; starIndex < STAR_COUNT; starIndex += 1) {
@@ -133,11 +143,25 @@ function createRandomStarPositions(): StarPosition[] {
   return placed;
 }
 
+function drawStageRect(
+  graphics: Graphics,
+  width: number,
+  height: number,
+  fillColor: string | number,
+) {
+  graphics.clear();
+  graphics.rect(0, 0, width, height);
+  graphics.fill({ color: fillColor, alpha: 1 });
+}
+
 export const Star = ({
   hasRecording,
   starGifUrls,
   faceRegions,
   captureError,
+  stageWidth = DEFAULT_STAGE_WIDTH,
+  stageHeight = DEFAULT_STAGE_HEIGHT,
+  stageColor = DEFAULT_STAGE_COLOR,
 }: StarProps) => {
   const placementKey = faceRegions.join(",");
 
@@ -146,8 +170,15 @@ export const Star = ({
       return [];
     }
 
-    return createRandomStarPositions();
-  }, [hasRecording, placementKey]);
+    return createRandomStarPositions(stageWidth, stageHeight);
+  }, [hasRecording, placementKey, stageWidth, stageHeight]);
+
+  const drawStage = useCallback(
+    (graphics: Graphics) => {
+      drawStageRect(graphics, stageWidth, stageHeight, stageColor);
+    },
+    [stageWidth, stageHeight, stageColor],
+  );
 
   return (
     <div>
@@ -155,7 +186,22 @@ export const Star = ({
 
       {hasRecording && (
         <div className="mt-2">
-          <div className="relative h-full w-full">
+          <div
+            className="relative"
+            style={{ width: stageWidth, height: stageHeight }}
+          >
+            <Application
+              width={stageWidth}
+              height={stageHeight}
+              backgroundAlpha={0}
+              antialias
+              eventMode="none"
+              autoStart
+              className="absolute inset-0 block h-full w-full"
+            >
+              <pixiGraphics draw={drawStage} />
+            </Application>
+
             {starGifUrls.map((gifUrl, index) => {
               const position = starPositions[index];
               if (!position) {
@@ -165,7 +211,7 @@ export const Star = ({
               return (
                 <div
                   key={index}
-                  className="absolute"
+                  className="absolute z-10"
                   style={{
                     left: position.x,
                     top: position.y,
@@ -191,27 +237,6 @@ export const Star = ({
                     />
                   )}
                 </div>
-              );
-            })}
-          </div>
-
-          <div
-            className="mt-2 flex flex-col gap-1"
-            style={{ width: STAGE_WIDTH }}
-          >
-            {starGifUrls.map((_, index) => {
-              const { frameStart, frameEnd } = STAR_FRAME_SLICES[index];
-              const regionLabel = faceRegions[index]
-                ? FACE_REGION_LABELS[faceRegions[index]]
-                : null;
-
-              return (
-                <p key={index} className="m-0 text-sm text-gray-500">
-                  Star {index + 1}
-                  {regionLabel
-                    ? ` · ${regionLabel} (frames ${frameStart}-${frameEnd})`
-                    : ""}
-                </p>
               );
             })}
           </div>
