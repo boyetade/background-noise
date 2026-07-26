@@ -1,7 +1,5 @@
 import { useMemo } from "react";
-import { HandDrawnRectOutline } from "./HandDrawnRectOutline";
 import { FACE_REGION_LABELS, type FaceRegion } from "../utils/faceZoom";
-import { hashStringToSeed } from "../utils/handDrawnRect";
 import {
   STAR_COUNT,
   STAR_FRAME_SLICES,
@@ -139,10 +137,8 @@ export const Star = ({
   hasRecording,
   starGifUrls,
   faceRegions,
-  isCreatingGifs,
   captureError,
 }: StarProps) => {
-  const createdGifCount = starGifUrls.filter(Boolean).length;
   const placementKey = faceRegions.join(",");
 
   const starPositions = useMemo(() => {
@@ -153,83 +149,51 @@ export const Star = ({
     return createRandomStarPositions();
   }, [hasRecording, placementKey]);
 
-  const outlineSeed = useMemo(
-    () => hashStringToSeed(placementKey || "stage-outline"),
-    [placementKey],
-  );
-
   return (
     <div>
-      <p>Star crop GIFs (frames 2–5, 6–10, 11–15)</p>
-
-      {!hasRecording && (
-        <p className="text-gray-500">
-          Record a video to see star-shaped GIF previews — each star shows a
-          different part of your face.
-        </p>
-      )}
-
-      {hasRecording && isCreatingGifs && (
-        <p className="text-gray-500">Creating star GIFs...</p>
-      )}
-
-      {hasRecording && !isCreatingGifs && createdGifCount > 0 && (
-        <p className="text-gray-500">
-          Showing {createdGifCount} star GIF
-          {createdGifCount === 1 ? "" : "s"}, one per face region.
-        </p>
-      )}
-
       {captureError && <p className="text-red-600">{captureError}</p>}
 
       {hasRecording && (
         <div className="mt-2">
-          <HandDrawnRectOutline
-            width={STAGE_WIDTH}
-            height={STAGE_HEIGHT}
-            seed={outlineSeed}
-            contentInset={0}
-          >
-            <div className="relative h-full w-full">
-              {starGifUrls.map((gifUrl, index) => {
-                const position = starPositions[index];
-                if (!position) {
-                  return null;
-                }
+          <div className="relative h-full w-full">
+            {starGifUrls.map((gifUrl, index) => {
+              const position = starPositions[index];
+              if (!position) {
+                return null;
+              }
 
-                return (
-                  <div
-                    key={index}
-                    className="absolute"
-                    style={{
-                      left: position.x,
-                      top: position.y,
-                      width: STAR_OUTPUT_SIZE,
-                      height: STAR_OUTPUT_SIZE,
-                    }}
-                  >
-                    {gifUrl ? (
-                      <img
-                        src={gifUrl}
-                        alt={`Star crop GIF ${index + 1}`}
-                        width={STAR_OUTPUT_SIZE}
-                        height={STAR_OUTPUT_SIZE}
-                        className="block"
-                      />
-                    ) : (
-                      <div
-                        className="border border-dashed border-white/60 bg-black/10"
-                        style={{
-                          width: STAR_OUTPUT_SIZE,
-                          height: STAR_OUTPUT_SIZE,
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </HandDrawnRectOutline>
+              return (
+                <div
+                  key={index}
+                  className="absolute"
+                  style={{
+                    left: position.x,
+                    top: position.y,
+                    width: STAR_OUTPUT_SIZE,
+                    height: STAR_OUTPUT_SIZE,
+                  }}
+                >
+                  {gifUrl ? (
+                    <img
+                      src={gifUrl}
+                      alt={`Star crop GIF ${index + 1}`}
+                      width={STAR_OUTPUT_SIZE}
+                      height={STAR_OUTPUT_SIZE}
+                      className="block"
+                    />
+                  ) : (
+                    <div
+                      className="border border-dashed border-white/60 bg-black/10"
+                      style={{
+                        width: STAR_OUTPUT_SIZE,
+                        height: STAR_OUTPUT_SIZE,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
           <div
             className="mt-2 flex flex-col gap-1"

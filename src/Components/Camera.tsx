@@ -5,6 +5,7 @@ type CameraProps = {
   isModelLoading: boolean;
   className?: string;
   previewClassName?: string;
+  hideCanvas?: boolean;
 };
 
 export function Camera({
@@ -12,6 +13,7 @@ export function Camera({
   isModelLoading,
   className,
   previewClassName,
+  hideCanvas = false,
 }: CameraProps) {
   return (
     <div className={className}>
@@ -20,9 +22,11 @@ export function Camera({
 
         <canvas
           ref={canvasRef}
-          width={500}
-          height={500}
-          className="block h-full w-full object-cover"
+          className={
+            hideCanvas
+              ? "pointer-events-none absolute h-px w-px opacity-0"
+              : "block h-full w-full object-cover"
+          }
         />
       </div>
     </div>

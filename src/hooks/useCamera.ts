@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import Webcam from "react-webcam";
 import * as bodySegmentation from "@tensorflow-models/body-segmentation";
 import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import * as tf from "@tensorflow/tfjs";
@@ -60,14 +59,14 @@ function captureCanvasFrame(canvas: HTMLCanvasElement): ImageData | null {
 }
 
 type UseCameraOptions = {
-  webcamRef: RefObject<Webcam | null>;
+  videoRef: RefObject<HTMLVideoElement | null>;
   isWebcamReady: boolean;
   onRecordingStart?: () => void;
   onRecordingComplete?: (result: StarRecordingResult) => void;
 };
 
 export function useCamera({
-  webcamRef,
+  videoRef,
   isWebcamReady,
   onRecordingStart,
   onRecordingComplete,
@@ -267,10 +266,40 @@ export function useCamera({
       recordingCanvasRef.current = document.createElement("canvas");
       setIsModelLoading(false);
 
-      const processFrame = async () => {
-        if (cancelled || isProcessing) return;
+      const drawLivePreview = () => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
 
-        const video = webcamRef.current?.video;
+        if (
+          !video ||
+          !canvas ||
+          !isWebcamReady ||
+          video.readyState < video.HAVE_ENOUGH_DATA
+        ) {
+          return;
+        }
+
+        syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
+        const previewCtx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!previewCtx) {
+          return;
+        }
+
+        previewCtx.save();
+        previewCtx.translate(canvas.width, 0);
+        previewCtx.scale(-1, 1);
+        previewCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        previewCtx.restore();
+      };
+
+      const processFrame = async () => {
+        if (cancelled) return;
+
+        drawLivePreview();
+
+        if (isProcessing) return;
+
+        const video = videoRef.current;
         const canvas = canvasRef.current;
         const offscreenCanvas = offscreenCanvasRef.current;
         const recordingCanvas = recordingCanvasRef.current;
@@ -293,7 +322,6 @@ export function useCamera({
         isProcessing = true;
 
         try {
-          syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
           syncCanvasSize(offscreenCanvas, video.videoWidth, video.videoHeight);
           syncCanvasSize(recordingCanvas, video.videoWidth, video.videoHeight);
 
@@ -314,12 +342,6 @@ export function useCamera({
             offscreenCanvas.height,
           );
           offscreenCtx.restore();
-
-          ctx.save();
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          ctx.restore();
 
           const frame = offscreenCtx.getImageData(
             0,
@@ -346,6 +368,7 @@ export function useCamera({
           });
 
           drawPersonCutoutOnTop(offscreenCtx, frame, personMask);
+          ctx.drawImage(offscreenCanvas, 0, 0);
 
           if (isRecordingRef.current) {
             const recordingCtx = recordingCanvas.getContext("2d", {
@@ -432,7 +455,7 @@ export function useCamera({
       });
       setGifUrl(null);
     };
-  }, [isWebcamReady, webcamRef]);
+  }, [isWebcamReady, videoRef]);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;

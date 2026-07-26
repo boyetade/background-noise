@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Quentin";
+  src: url("./assets/Quentin.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-stage: #73061a;
+  --font-quentin: "Quentin", cursive;
 }

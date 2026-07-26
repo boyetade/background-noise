@@ -1,23 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import Webcam from "react-webcam";
+import { useState } from "react";
 import { Camera } from "./Components/Camera";
 import { CameraControls } from "./Components/CameraControls";
-import { HandDrawnRectOutline } from "./Components/HandDrawnRectOutline";
 import { HandDrawnCircle } from "./Components/HandDrawnCircle";
 import { Star } from "./Components/Star";
 import { useCamera } from "./hooks/useCamera";
+import { useWebcamStream } from "./hooks/useWebcamStream";
 import {
   STAR_COUNT,
   buildStarGifUrls,
   type StarRecordingResult,
 } from "./utils/starGifs";
+import { CameraMask } from "./Components/CameraMask";
+import { RecordVideoPrompt } from "./Components/RecordVideoPrompt";
 
 const CAMERA_FRAME_WIDTH = 900;
 const CAMERA_FRAME_HEIGHT = 600;
+const RECORD_PROMPT_OFFSET = CAMERA_FRAME_WIDTH / 2;
 
 function App() {
-  const webcamRef = useRef<Webcam>(null);
-  const [isWebcamReady, setIsWebcamReady] = useState(false);
+  const { videoRef, attachVideoRef, isReady: isWebcamReady, error: webcamError } =
+    useWebcamStream();
   const [hasRecording, setHasRecording] = useState(false);
   const [starGifUrls, setStarGifUrls] = useState<(string | null)[]>(
     Array.from({ length: STAR_COUNT }, () => null),
@@ -27,22 +29,6 @@ function App() {
   >([]);
   const [isCreatingStarGifs, setIsCreatingStarGifs] = useState(false);
   const [starGifError, setStarGifError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const checkVideoReady = () => {
-      const video = webcamRef.current?.video;
-      if (video && video.readyState >= video.HAVE_ENOUGH_DATA) {
-        setIsWebcamReady(true);
-      }
-    };
-
-    checkVideoReady();
-    const intervalId = window.setInterval(checkVideoReady, 250);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   const handleRecordingStart = () => {
     setHasRecording(false);
@@ -74,7 +60,7 @@ function App() {
   };
 
   const camera = useCamera({
-    webcamRef,
+    videoRef,
     isWebcamReady,
     onRecordingStart: handleRecordingStart,
     onRecordingComplete: handleRecordingComplete,
@@ -82,42 +68,54 @@ function App() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <div
-        className="relative overflow-visible"
-        style={{ width: CAMERA_FRAME_WIDTH, height: CAMERA_FRAME_HEIGHT }}
-      >
-        <HandDrawnRectOutline
-          width={CAMERA_FRAME_WIDTH}
-          height={CAMERA_FRAME_HEIGHT}
-          seed={1}
+      {webcamError ? (
+        <p className="mb-4 text-sm text-red-700">{webcamError}</p>
+      ) : null}
+      <video
+        ref={attachVideoRef}
+        muted
+        playsInline
+        autoPlay
+        className="pointer-events-none fixed h-px w-px opacity-0"
+      />
+      <div className="relative flex w-full justify-center">
+        <div
+          className="relative overflow-visible"
+          style={{ width: CAMERA_FRAME_WIDTH, height: CAMERA_FRAME_HEIGHT }}
         >
-          <Webcam
-            ref={webcamRef}
-            audio={false}
-            screenshotFormat="image/jpeg"
-            screenshotQuality={0.9}
-            width={500}
-            height={500}
-            onUserMedia={() => setIsWebcamReady(true)}
-            className="pointer-events-none absolute h-px w-px opacity-0"
-          />
-
-          <Camera
+          <CameraMask
+            className="h-full w-full"
+            width={CAMERA_FRAME_WIDTH}
+            height={CAMERA_FRAME_HEIGHT}
+            videoRef={videoRef}
             canvasRef={camera.canvasRef}
+            isVideoReady={isWebcamReady}
             isModelLoading={camera.isModelLoading}
-            className="h-full"
-            previewClassName="relative h-full min-h-0"
-          />
-        </HandDrawnRectOutline>
+          >
+            <Camera
+              canvasRef={camera.canvasRef}
+              isModelLoading={camera.isModelLoading}
+              hideCanvas
+            />
+          </CameraMask>
 
-        <HandDrawnCircle
-          className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-[calc(50%-55px)]"
-          radius={26}
-          onClick={camera.controls.onStartRecording}
-          disabled={
+          <HandDrawnCircle
+            className="absolute bottom-0 left-1/2 z-20 -translate-x-1/2 translate-y-[calc(50%-55px)]"
+            radius={26}
+            onClick={camera.controls.onStartRecording}
+            disabled={
+              camera.controls.isRecording || camera.controls.isModelLoading
+            }
+            isRecording={camera.controls.isRecording}
+          />
+        </div>
+
+        <RecordVideoPrompt
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: `calc(50% + ${RECORD_PROMPT_OFFSET}px + 2.5rem)` }}
+          hidden={
             camera.controls.isRecording || camera.controls.isModelLoading
           }
-          isRecording={camera.controls.isRecording}
         />
       </div>
 

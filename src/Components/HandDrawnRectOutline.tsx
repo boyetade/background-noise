@@ -3,6 +3,7 @@ import { Application, useTick } from "@pixi/react";
 import { useCallback, useMemo, useRef, type ReactNode } from "react";
 import type { Graphics } from "pixi.js";
 import { createHandDrawnRectPaths, type Point } from "../utils/handDrawnRect";
+import { CameraViewfinderOverlay } from "./CameraViewfinderOverlay";
 
 export const OUTLINE_FRAME_COUNT = 3;
 export const OUTLINE_FRAME_DURATION_MS = 300;
@@ -17,6 +18,10 @@ type HandDrawnRectOutlineProps = {
   jitter?: number;
   inset?: number;
   contentInset?: number;
+  isRecording?: boolean;
+  recordingSecondsLeft?: string;
+  capturedFrameCount?: number;
+  maxFrames?: number;
   children?: ReactNode;
 };
 
@@ -113,6 +118,10 @@ export function HandDrawnRectOutline({
   jitter = 3,
   inset = OUTLINE_DEFAULT_INSET,
   contentInset,
+  isRecording = false,
+  recordingSecondsLeft,
+  capturedFrameCount,
+  maxFrames,
   children,
 }: HandDrawnRectOutlineProps) {
   const resolvedContentInset = contentInset ?? inset;
@@ -158,6 +167,14 @@ export function HandDrawnRectOutline({
           />
         </Application>
       </div>
+
+      <CameraViewfinderOverlay
+        isRecording={isRecording}
+        recordingSecondsLeft={recordingSecondsLeft}
+        capturedFrameCount={capturedFrameCount}
+        maxFrames={maxFrames}
+        inset={resolvedContentInset}
+      />
     </div>
   );
 }

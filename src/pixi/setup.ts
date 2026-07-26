@@ -1,4 +1,4 @@
 import { extend } from "@pixi/react";
-import { Graphics } from "pixi.js";
+import { Graphics, Sprite } from "pixi.js";
 
-extend({ Graphics });
+extend({ Graphics, Sprite });
