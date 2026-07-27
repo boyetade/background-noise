@@ -14,6 +14,7 @@ export const DEFAULT_STAGE_HEIGHT = 200;
 export const DEFAULT_STAGE_COLOR = STAR_GIF_BACKGROUND;
 export const STAR_REVEAL_INTERVAL_MS = 1000;
 export const STAR_BORDER_PADDING = 6;
+export const STAR_CONTENT_GAP = 10;
 
 const STAGE_PADDING_Y = 40;
 const STAGE_PADDING_X = 10;
@@ -125,8 +126,7 @@ function createRandomStarPositions(
 ): StarPosition[] {
   const bounds = createPlacementBounds(stageWidth, stageHeight);
   const placed: StarPosition[] = [];
-  const random =
-    seed === undefined ? Math.random : createSeededRandom(seed);
+  const random = seed === undefined ? Math.random : createSeededRandom(seed);
 
   for (let starIndex = 0; starIndex < STAR_COUNT; starIndex += 1) {
     let position: StarPosition | null = null;
@@ -247,10 +247,10 @@ export const Star = ({
 
       <div className="relative flex w-full items-center justify-center">
         <HandDrawnRectOutline
-          width={stageWidth + STAR_BORDER_PADDING * 2}
-          height={stageHeight + STAR_BORDER_PADDING * 2}
+          width={stageWidth + (STAR_BORDER_PADDING + STAR_CONTENT_GAP) * 2}
+          height={stageHeight + (STAR_BORDER_PADDING + STAR_CONTENT_GAP) * 2}
           inset={STAR_BORDER_PADDING}
-          contentInset={STAR_BORDER_PADDING}
+          contentInset={STAR_BORDER_PADDING + STAR_CONTENT_GAP}
           strokeColor="#ffffff"
           strokeWidth={1}
           jitter={0.35}
@@ -259,10 +259,7 @@ export const Star = ({
           animated={false}
           showViewfinderOverlay={false}
         >
-          <div
-            className="relative h-full w-full"
-            style={{ width: stageWidth, height: stageHeight }}
-          >
+          <div className="relative h-full w-full">
             <Application
               width={stageWidth}
               height={stageHeight}
@@ -319,7 +316,7 @@ export const Star = ({
           </div>
         </HandDrawnRectOutline>
 
-        <div className="absolute right-4 top-1/2 flex -translate-y-1/2 flex-col gap-3">
+        <div className="absolute right-[calc(50%-750px)] top-1/2 flex -translate-y-1/2 flex-col gap-3">
           <button
             type="button"
             onClick={shuffleStarPositions}

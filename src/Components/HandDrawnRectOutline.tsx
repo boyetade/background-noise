@@ -152,32 +152,35 @@ export function HandDrawnRectOutline({
   children,
 }: HandDrawnRectOutlineProps) {
   const resolvedContentInset = contentInset ?? inset;
+  const strokePad = Math.ceil(strokeWidth / 2);
+  const outlineWidth = width + strokePad * 2;
+  const outlineHeight = height + strokePad * 2;
   const path = useMemo(
     () =>
-      createHandDrawnRectPath(0, 0, width, height, {
+      createHandDrawnRectPath(strokePad, strokePad, width, height, {
         seed,
         jitter,
         inset,
         step,
       }),
-    [width, height, seed, jitter, inset, step],
+    [width, height, seed, jitter, inset, step, strokePad],
   );
   const paths = useMemo(
     () =>
-      createHandDrawnRectPaths(0, 0, width, height, {
+      createHandDrawnRectPaths(strokePad, strokePad, width, height, {
         seed,
         jitter,
         inset,
         step,
         passes: OUTLINE_FRAME_COUNT,
       }),
-    [width, height, seed, jitter, inset, step],
+    [width, height, seed, jitter, inset, step, strokePad],
   );
 
   return (
-    <div className="relative" style={{ width, height }}>
+    <div className="relative overflow-visible" style={{ width, height }}>
       <div
-        className="absolute overflow-hidden"
+        className="absolute z-0 overflow-hidden"
         style={{
           top: resolvedContentInset,
           right: resolvedContentInset,
@@ -188,10 +191,18 @@ export function HandDrawnRectOutline({
         {children}
       </div>
 
-      <div className="pointer-events-none absolute inset-0 z-10">
+      <div
+        className="pointer-events-none absolute z-20"
+        style={{
+          top: -strokePad,
+          left: -strokePad,
+          width: outlineWidth,
+          height: outlineHeight,
+        }}
+      >
         <Application
-          width={width}
-          height={height}
+          width={outlineWidth}
+          height={outlineHeight}
           backgroundAlpha={0}
           antialias
           eventMode="none"
