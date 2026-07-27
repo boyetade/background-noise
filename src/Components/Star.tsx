@@ -16,6 +16,8 @@ export const STAR_REVEAL_INTERVAL_MS = 1000;
 export const STAR_BORDER_PADDING = 6;
 export const STAR_CONTENT_GAP = 10;
 
+export type StageOrientation = "landscape" | "portrait";
+
 const STAGE_PADDING_Y = 40;
 const STAGE_PADDING_X = 10;
 const MIN_STAR_SPACING = 5;
@@ -185,6 +187,16 @@ export const Star = ({
   const placementKey = faceRegions.join(",");
   const [visibleStarCount, setVisibleStarCount] = useState(0);
   const [positionSeed, setPositionSeed] = useState(0);
+  const [orientation, setOrientation] = useState<StageOrientation>("landscape");
+
+  const resolvedStageWidth =
+    orientation === "landscape" ? stageWidth : stageHeight + 60;
+  const resolvedStageHeight =
+    orientation === "landscape" ? stageHeight - 10 : stageWidth - 100;
+  const outlineWidth =
+    resolvedStageWidth + (STAR_BORDER_PADDING + STAR_CONTENT_GAP) * 2;
+  const outlineHeight =
+    resolvedStageHeight + (STAR_BORDER_PADDING + STAR_CONTENT_GAP) * 2;
 
   const starPositions = useMemo(() => {
     if (!hasRecording || !placementKey) {
@@ -197,13 +209,26 @@ export const Star = ({
     }
 
     return createRandomStarPositions(
-      stageWidth,
-      stageHeight,
+      resolvedStageWidth,
+      resolvedStageHeight,
       seed + positionSeed,
     );
-  }, [hasRecording, placementKey, stageWidth, stageHeight, positionSeed]);
+  }, [
+    hasRecording,
+    placementKey,
+    resolvedStageWidth,
+    resolvedStageHeight,
+    positionSeed,
+  ]);
 
   const shuffleStarPositions = () => {
+    setPositionSeed((current) => current + 1);
+  };
+
+  const toggleStageOrientation = () => {
+    setOrientation((current) =>
+      current === "landscape" ? "portrait" : "landscape",
+    );
     setPositionSeed((current) => current + 1);
   };
 
@@ -226,9 +251,14 @@ export const Star = ({
 
   const drawStage = useCallback(
     (graphics: Graphics) => {
-      drawStageRect(graphics, stageWidth, stageHeight, stageColor);
+      drawStageRect(
+        graphics,
+        resolvedStageWidth,
+        resolvedStageHeight,
+        stageColor,
+      );
     },
-    [stageWidth, stageHeight, stageColor],
+    [resolvedStageWidth, resolvedStageHeight, stageColor],
   );
 
   const [texture, setTexture] = useState<Texture>(Texture.EMPTY);
@@ -241,100 +271,135 @@ export const Star = ({
     }
   }, [texture]);
 
+  const stageOutline = (
+    <HandDrawnRectOutline
+      width={outlineWidth}
+      height={outlineHeight}
+      inset={STAR_BORDER_PADDING}
+      contentInset={STAR_BORDER_PADDING + STAR_CONTENT_GAP}
+      strokeColor="#ffffff"
+      strokeWidth={1}
+      jitter={0.35}
+      step={28}
+      seed={17}
+      animated={false}
+      showViewfinderOverlay={false}
+    >
+      <div className="relative h-full w-full">
+        <Application
+          width={resolvedStageWidth}
+          height={resolvedStageHeight}
+          backgroundAlpha={0}
+          antialias
+          eventMode="none"
+          autoStart
+          className="absolute inset-0 block h-full w-full"
+        >
+          <pixiGraphics draw={drawStage} />
+        </Application>
+
+        {starGifUrls.map((gifUrl, index) => {
+          if (index >= visibleStarCount) {
+            return null;
+          }
+
+          const position = starPositions[index];
+          if (!position) {
+            return null;
+          }
+
+          return (
+            <div
+              key={index}
+              className="absolute z-10"
+              style={{
+                left: position.x,
+                top: position.y,
+                width: STAR_OUTPUT_SIZE,
+                height: STAR_OUTPUT_SIZE,
+              }}
+            >
+              {gifUrl ? (
+                <img
+                  src={gifUrl}
+                  alt={`Star crop GIF ${index + 1}`}
+                  width={STAR_OUTPUT_SIZE}
+                  height={STAR_OUTPUT_SIZE}
+                  className="block"
+                />
+              ) : (
+                <div
+                  className="border border-dashed border-white/60 bg-black/10"
+                  style={{
+                    width: STAR_OUTPUT_SIZE,
+                    height: STAR_OUTPUT_SIZE,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </HandDrawnRectOutline>
+  );
+
+  const controlButtons = (
+    <>
+      <button
+        type="button"
+        onClick={toggleStageOrientation}
+        className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90"
+      >
+        <BoxedWordsText
+          text={
+            orientation === "landscape" ? "Turn portrait" : "Turn landscape"
+          }
+          boxClassName="text-lg"
+        />
+      </button>
+
+      <button
+        type="button"
+        onClick={shuffleStarPositions}
+        className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90"
+      >
+        <BoxedWordsText text="Shuffle stars" boxClassName="text-lg" />
+      </button>
+
+      <button
+        type="button"
+        onClick={onShuffleStageColor}
+        disabled={!onShuffleStageColor}
+        className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <BoxedWordsText text="Shuffle color" boxClassName="text-lg" />
+      </button>
+    </>
+  );
+
+  const stageLayout = (
+    <div className="relative flex w-full items-center justify-center">
+      {stageOutline}
+      <div
+        className="absolute top-1/2 flex -translate-y-1/2 flex-col gap-3"
+        style={{ left: `calc(50% + ${outlineWidth / 2}px + 1rem)` }}
+      >
+        {controlButtons}
+      </div>
+    </div>
+  );
+
   return (
     <div className="w-full">
       {captureError && <p className="text-red-600">{captureError}</p>}
 
-      <div className="relative flex w-full items-center justify-center">
-        <HandDrawnRectOutline
-          width={stageWidth + (STAR_BORDER_PADDING + STAR_CONTENT_GAP) * 2}
-          height={stageHeight + (STAR_BORDER_PADDING + STAR_CONTENT_GAP) * 2}
-          inset={STAR_BORDER_PADDING}
-          contentInset={STAR_BORDER_PADDING + STAR_CONTENT_GAP}
-          strokeColor="#ffffff"
-          strokeWidth={1}
-          jitter={0.35}
-          step={28}
-          seed={17}
-          animated={false}
-          showViewfinderOverlay={false}
-        >
-          <div className="relative h-full w-full">
-            <Application
-              width={stageWidth}
-              height={stageHeight}
-              backgroundAlpha={0}
-              antialias
-              eventMode="none"
-              autoStart
-              className="absolute inset-0 block h-full w-full"
-            >
-              <pixiGraphics draw={drawStage} />
-            </Application>
-
-            {starGifUrls.map((gifUrl, index) => {
-              if (index >= visibleStarCount) {
-                return null;
-              }
-
-              const position = starPositions[index];
-              if (!position) {
-                return null;
-              }
-
-              return (
-                <div
-                  key={index}
-                  className="absolute z-10"
-                  style={{
-                    left: position.x,
-                    top: position.y,
-                    width: STAR_OUTPUT_SIZE,
-                    height: STAR_OUTPUT_SIZE,
-                  }}
-                >
-                  {gifUrl ? (
-                    <img
-                      src={gifUrl}
-                      alt={`Star crop GIF ${index + 1}`}
-                      width={STAR_OUTPUT_SIZE}
-                      height={STAR_OUTPUT_SIZE}
-                      className="block"
-                    />
-                  ) : (
-                    <div
-                      className="border border-dashed border-white/60 bg-black/10"
-                      style={{
-                        width: STAR_OUTPUT_SIZE,
-                        height: STAR_OUTPUT_SIZE,
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </HandDrawnRectOutline>
-
-        <div className="absolute right-[calc(50%-750px)] top-1/2 flex -translate-y-1/2 flex-col gap-3">
-          <button
-            type="button"
-            onClick={shuffleStarPositions}
-            className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90"
-          >
-            <BoxedWordsText text="Shuffle stars" boxClassName="text-lg" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onShuffleStageColor}
-            disabled={!onShuffleStageColor}
-            className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <BoxedWordsText text="Shuffle color" boxClassName="text-lg" />
-          </button>
+      {orientation === "portrait" ? (
+        <div className="fixed inset-0 z-10 flex justify-center overflow-y-auto px-4 pb-16 pt-80">
+          {stageLayout}
         </div>
-      </div>
+      ) : (
+        stageLayout
+      )}
     </div>
   );
 };

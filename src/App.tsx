@@ -169,7 +169,7 @@ function App() {
   return (
     <>
       <AppBackground />
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-4">
+      <div className="relative flex min-h-screen flex-col items-center px-4">
         {webcamError ? (
           <p className="mb-4 text-sm text-red-700">{webcamError}</p>
         ) : null}
@@ -182,6 +182,7 @@ function App() {
         />
 
         {!isStarReady ? (
+          <div className="flex w-full flex-1 items-center justify-center">
           <div className="relative flex w-full justify-center">
             <PaperCameraFrame width={900} height={800}>
               <CameraMask
@@ -223,6 +224,7 @@ function App() {
               hidden={isRecordPromptHidden}
             />
           </div>
+          </div>
         ) : (
           <>
             <button
@@ -236,23 +238,26 @@ function App() {
               />
             </button>
 
-            <div className="flex w-full flex-col items-center justify-center gap-4">
+            <div className="flex w-full flex-1 flex-col items-center gap-4 pt-24 pb-8">
               <BoxedWordsText
                 text="A Constelliation of You"
                 boxClassName="text-2xl"
+                className="relative z-20 shrink-0"
               />
 
-              <Star
-                key={starFaceRegions.join(",")}
-                hasRecording={hasRecording}
-                starGifUrls={starGifUrls}
-                faceRegions={starFaceRegions}
-                captureError={starGifError}
-                stageWidth={STAR_STAGE_WIDTH}
-                stageHeight={STAR_STAGE_HEIGHT}
-                stageColor={stageColor}
-                onShuffleStageColor={handleShuffleStageColor}
-              />
+              <div className="flex w-full flex-1 items-center justify-center">
+                <Star
+                  key={starFaceRegions.join(",")}
+                  hasRecording={hasRecording}
+                  starGifUrls={starGifUrls}
+                  faceRegions={starFaceRegions}
+                  captureError={starGifError}
+                  stageWidth={STAR_STAGE_WIDTH}
+                  stageHeight={STAR_STAGE_HEIGHT}
+                  stageColor={stageColor}
+                  onShuffleStageColor={handleShuffleStageColor}
+                />
+              </div>
             </div>
           </>
         )}
