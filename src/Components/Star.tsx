@@ -1,13 +1,15 @@
 import "../pixi/setup";
 import { Application } from "@pixi/react";
-import { useCallback, useMemo } from "react";
-import type { Graphics } from "pixi.js";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Assets, Texture, type Graphics } from "pixi.js";
 import { type FaceRegion } from "../utils/faceZoom";
 import { STAR_COUNT, STAR_OUTPUT_SIZE } from "../utils/starGifs";
+import starTexture from "../assets/starTexture.png";
 
 export const DEFAULT_STAGE_WIDTH = 800;
 export const DEFAULT_STAGE_HEIGHT = 200;
 export const DEFAULT_STAGE_COLOR = "#73061a";
+export const STAR_REVEAL_INTERVAL_MS = 1000;
 
 const STAGE_PADDING_Y = 40;
 const STAGE_PADDING_X = 10;
@@ -84,7 +86,6 @@ type StarProps = {
   hasRecording: boolean;
   starGifUrls: (string | null)[];
   faceRegions: FaceRegion[];
-  isCreatingGifs: boolean;
   captureError: string | null;
   stageWidth?: number;
   stageHeight?: number;
@@ -164,6 +165,7 @@ export const Star = ({
   stageColor = DEFAULT_STAGE_COLOR,
 }: StarProps) => {
   const placementKey = faceRegions.join(",");
+  const [visibleStarCount, setVisibleStarCount] = useState(0);
 
   const starPositions = useMemo(() => {
     if (!hasRecording || !placementKey) {
@@ -173,6 +175,23 @@ export const Star = ({
     return createRandomStarPositions(stageWidth, stageHeight);
   }, [hasRecording, placementKey, stageWidth, stageHeight]);
 
+  useEffect(() => {
+    const timerIds = Array.from({ length: STAR_COUNT }, (_, index) =>
+      window.setTimeout(
+        () => {
+          setVisibleStarCount(index + 1);
+        },
+        (index + 1) * STAR_REVEAL_INTERVAL_MS,
+      ),
+    );
+
+    return () => {
+      timerIds.forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    };
+  }, [placementKey]);
+
   const drawStage = useCallback(
     (graphics: Graphics) => {
       drawStageRect(graphics, stageWidth, stageHeight, stageColor);
@@ -180,68 +199,78 @@ export const Star = ({
     [stageWidth, stageHeight, stageColor],
   );
 
+  const [texture, setTexture] = useState<Texture>(Texture.EMPTY);
+
+  useEffect(() => {
+    if (texture === Texture.EMPTY) {
+      Assets.load(starTexture).then((result) => {
+        setTexture(result);
+      });
+    }
+  }, [texture]);
+
   return (
     <div>
       {captureError && <p className="text-red-600">{captureError}</p>}
 
-      {hasRecording && (
-        <div className="mt-2">
-          <div
-            className="relative"
-            style={{ width: stageWidth, height: stageHeight }}
-          >
-            <Application
-              width={stageWidth}
-              height={stageHeight}
-              backgroundAlpha={0}
-              antialias
-              eventMode="none"
-              autoStart
-              className="absolute inset-0 block h-full w-full"
+      <div
+        className="relative"
+        style={{ width: stageWidth, height: stageHeight }}
+      >
+        <Application
+          width={stageWidth}
+          height={stageHeight}
+          backgroundAlpha={0}
+          antialias
+          eventMode="none"
+          autoStart
+          className="absolute inset-0 block h-full w-full"
+        >
+          <pixiGraphics draw={drawStage} />
+        </Application>
+
+        {starGifUrls.map((gifUrl, index) => {
+          if (index >= visibleStarCount) {
+            return null;
+          }
+
+          const position = starPositions[index];
+          if (!position) {
+            return null;
+          }
+
+          return (
+            <div
+              key={index}
+              className="absolute z-10"
+              style={{
+                left: position.x,
+                top: position.y,
+                width: STAR_OUTPUT_SIZE,
+                height: STAR_OUTPUT_SIZE,
+              }}
             >
-              <pixiGraphics draw={drawStage} />
-            </Application>
-
-            {starGifUrls.map((gifUrl, index) => {
-              const position = starPositions[index];
-              if (!position) {
-                return null;
-              }
-
-              return (
+              {gifUrl ? (
+                <img
+                  src={gifUrl}
+                  alt={`Star crop GIF ${index + 1}`}
+                  width={STAR_OUTPUT_SIZE}
+                  height={STAR_OUTPUT_SIZE}
+                  className="block"
+                />
+              ) : (
                 <div
-                  key={index}
-                  className="absolute z-10"
+                  className="border border-dashed border-white/60 bg-black/10"
                   style={{
-                    left: position.x,
-                    top: position.y,
                     width: STAR_OUTPUT_SIZE,
                     height: STAR_OUTPUT_SIZE,
                   }}
-                >
-                  {gifUrl ? (
-                    <img
-                      src={gifUrl}
-                      alt={`Star crop GIF ${index + 1}`}
-                      width={STAR_OUTPUT_SIZE}
-                      height={STAR_OUTPUT_SIZE}
-                      className="block"
-                    />
-                  ) : (
-                    <div
-                      className="border border-dashed border-white/60 bg-black/10"
-                      style={{
-                        width: STAR_OUTPUT_SIZE,
-                        height: STAR_OUTPUT_SIZE,
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

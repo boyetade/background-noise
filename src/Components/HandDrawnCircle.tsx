@@ -1,6 +1,6 @@
 import "../pixi/setup";
 import { Application } from "@pixi/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, type CSSProperties } from "react";
 import type { Graphics } from "pixi.js";
 
 type Point = {
@@ -17,6 +17,7 @@ type HandDrawnCircleProps = {
   padding?: number;
   seed?: number;
   className?: string;
+  style?: CSSProperties;
   disabled?: boolean;
   isRecording?: boolean;
   ariaLabel?: string;
@@ -129,6 +130,7 @@ export function HandDrawnCircle({
   padding = 8,
   seed = 7,
   className = "",
+  style,
   disabled = false,
   isRecording = false,
   ariaLabel = "Record 8 second video",
@@ -181,7 +183,7 @@ export function HandDrawnCircle({
       aria-label={ariaLabel}
       aria-pressed={isRecording}
       className={`cursor-pointer border-0 bg-transparent p-0 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-      style={{ width: canvasSize, height: canvasSize }}
+      style={{ width: canvasSize, height: canvasSize, ...style }}
     >
       <Application
         width={canvasSize}

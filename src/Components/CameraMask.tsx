@@ -1,6 +1,6 @@
 import "../pixi/setup";
 import { Application, useTick } from "@pixi/react";
-import { useCallback, useMemo, type ReactNode, type RefObject } from "react";
+import { useCallback, useMemo, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type { Graphics, Texture } from "pixi.js";
 import { useCanvasTexture } from "../hooks/useCanvasTexture";
 import { useVideoTexture } from "../hooks/useVideoTexture";
@@ -9,6 +9,7 @@ import {
   pointsToSvgPath,
   type Point,
 } from "../utils/paperMaskPolygon";
+import { RecordingCountdown } from "./RecordingCountdown";
 
 export const PAPER_MASK_FILL = "#f3ecdf";
 
@@ -17,13 +18,17 @@ type CameraMaskProps = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   isVideoReady: boolean;
   isModelLoading: boolean;
+  countdown?: number | null;
   width?: number;
   height?: number;
   seed?: number;
   fillColor?: string | number;
   strokeColor?: string | number;
   mirror?: boolean;
+  clipToShape?: boolean;
+  showPaperOutline?: boolean;
   className?: string;
+  style?: CSSProperties;
   children?: ReactNode;
 };
 
@@ -82,7 +87,10 @@ function FeedSprite({
 }) {
   useTick(() => {
     const resource = texture.source.resource;
-    if (resource instanceof HTMLCanvasElement) {
+    if (
+      resource instanceof HTMLCanvasElement ||
+      resource instanceof HTMLVideoElement
+    ) {
       texture.source.update();
     }
   });
@@ -108,13 +116,17 @@ export function CameraMask({
   canvasRef,
   isVideoReady,
   isModelLoading,
+  countdown = null,
   width = 700,
   height = 550,
   seed = 11,
   fillColor = PAPER_MASK_FILL,
   strokeColor = "#c9bfb0",
   mirror = true,
+  clipToShape = true,
+  showPaperOutline = clipToShape,
   className,
+  style,
   children,
 }: CameraMaskProps) {
   const useCanvasFeed = isVideoReady && !isModelLoading;
@@ -145,14 +157,21 @@ export function CameraMask({
 
   return (
     <div
-      className={className}
+      className={className ?? "relative"}
       style={{
         width,
         height,
-        clipPath: `path("${clipPath}")`,
+        ...style,
+        ...(clipToShape ? { clipPath: `path("${clipPath}")` } : {}),
       }}
     >
       {children ? <div className="sr-only">{children}</div> : null}
+
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute h-px w-px opacity-0"
+        aria-hidden
+      />
 
       <Application
         width={width}
@@ -171,8 +190,10 @@ export function CameraMask({
             mirror={feedMirror}
           />
         ) : null}
-        <pixiGraphics draw={draw} />
+        {showPaperOutline ? <pixiGraphics draw={draw} /> : null}
       </Application>
+
+      {countdown !== null ? <RecordingCountdown value={countdown} /> : null}
     </div>
   );
 }
