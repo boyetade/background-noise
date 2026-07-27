@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import * as bodySegmentation from "@tensorflow-models/body-segmentation";
 import * as faceLandmarksDetection from "@tensorflow-models/face-landmarks-detection";
 import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl";
@@ -9,9 +8,8 @@ import {
   pickDistinctFaceRegions,
   type FaceRegion,
 } from "../utils/faceZoom";
-import { drawPersonCutoutOnTop } from "../utils/personCutout";
-import { createAlignedPersonMask } from "../utils/segmentationMask";
 import { createGifFromFrames } from "../utils/createGifFromFrames";
+import { grayscaleImageData } from "../utils/grayscaleImageData";
 import {
   FRAMES_PER_STAR,
   STAR_COUNT,
@@ -75,7 +73,6 @@ export function useCamera({
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recordingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isRecordingRef = useRef(false);
-  const segmenterRef = useRef<bodySegmentation.BodySegmenter | null>(null);
   const faceDetectorRef =
     useRef<faceLandmarksDetection.FaceLandmarksDetector | null>(null);
   const focusedFaceRegionRef = useRef<FaceRegion | null>(null);
@@ -87,6 +84,8 @@ export function useCamera({
   const recordingIntervalRef = useRef<number | null>(null);
   const videoFramesRef = useRef<ImageData[]>([]);
   const [isModelLoading, setIsModelLoading] = useState(true);
+  const [isPreviewReady, setIsPreviewReady] = useState(false);
+  const isPreviewReadyRef = useRef(false);
   const [plannedFaceRegions, setPlannedFaceRegions] = useState<FaceRegion[]>(
     [],
   );
@@ -235,16 +234,6 @@ export function useCamera({
       await tf.setBackend("webgl");
       await tf.ready();
 
-      const segmenter = await bodySegmentation.createSegmenter(
-        bodySegmentation.SupportedModels.BodyPix,
-        {
-          architecture: "MobileNetV1",
-          outputStride: 16,
-          multiplier: 0.75,
-          quantBytes: 4,
-        },
-      );
-
       const faceDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
         {
@@ -255,55 +244,22 @@ export function useCamera({
       );
 
       if (cancelled) {
-        segmenter.dispose();
         await faceDetector.dispose();
         return;
       }
 
-      segmenterRef.current = segmenter;
       faceDetectorRef.current = faceDetector;
       offscreenCanvasRef.current = document.createElement("canvas");
       recordingCanvasRef.current = document.createElement("canvas");
       setIsModelLoading(false);
 
-      const drawLivePreview = () => {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-
-        if (
-          !video ||
-          !canvas ||
-          !isWebcamReady ||
-          video.readyState < video.HAVE_ENOUGH_DATA
-        ) {
-          return;
-        }
-
-        syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
-        const previewCtx = canvas.getContext("2d", { willReadFrequently: true });
-        if (!previewCtx) {
-          return;
-        }
-
-        previewCtx.save();
-        previewCtx.translate(canvas.width, 0);
-        previewCtx.scale(-1, 1);
-        previewCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        previewCtx.restore();
-      };
-
       const processFrame = async () => {
-        if (cancelled) return;
-
-        drawLivePreview();
-
-        if (isProcessing) return;
+        if (cancelled || isProcessing) return;
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
         const offscreenCanvas = offscreenCanvasRef.current;
         const recordingCanvas = recordingCanvasRef.current;
-        const segmenter = segmenterRef.current;
         const faceDetector = faceDetectorRef.current;
 
         if (
@@ -311,7 +267,6 @@ export function useCamera({
           !canvas ||
           !offscreenCanvas ||
           !recordingCanvas ||
-          !segmenter ||
           !faceDetector ||
           !isWebcamReady ||
           video.readyState < video.HAVE_ENOUGH_DATA
@@ -322,6 +277,7 @@ export function useCamera({
         isProcessing = true;
 
         try {
+          syncCanvasSize(canvas, video.videoWidth, video.videoHeight);
           syncCanvasSize(offscreenCanvas, video.videoWidth, video.videoHeight);
           syncCanvasSize(recordingCanvas, video.videoWidth, video.videoHeight);
 
@@ -343,32 +299,15 @@ export function useCamera({
           );
           offscreenCtx.restore();
 
-          const frame = offscreenCtx.getImageData(
-            0,
-            0,
-            offscreenCanvas.width,
-            offscreenCanvas.height,
-          );
-          const segmentations = await segmenter.segmentPeople(offscreenCanvas, {
-            flipHorizontal: false,
-            multiSegmentation: false,
-            segmentBodyParts: false,
-            internalResolution: "high",
-            segmentationThreshold: 0.7,
-          });
-
-          const personMask = await createAlignedPersonMask(
-            segmentations,
-            offscreenCanvas.width,
-            offscreenCanvas.height,
-          );
-
           const faces = await faceDetector.estimateFaces(offscreenCanvas, {
             flipHorizontal: false,
           });
 
-          drawPersonCutoutOnTop(offscreenCtx, frame, personMask);
           ctx.drawImage(offscreenCanvas, 0, 0);
+          if (!isPreviewReadyRef.current) {
+            isPreviewReadyRef.current = true;
+            setIsPreviewReady(true);
+          }
 
           if (isRecordingRef.current) {
             const recordingCtx = recordingCanvas.getContext("2d", {
@@ -425,6 +364,8 @@ export function useCamera({
     return () => {
       cancelled = true;
       cancelAnimationFrame(animationFrameId);
+      isPreviewReadyRef.current = false;
+      setIsPreviewReady(false);
 
       if (recordingTimeoutRef.current !== null) {
         window.clearTimeout(recordingTimeoutRef.current);
@@ -438,9 +379,6 @@ export function useCamera({
       if (recorder && recorder.state !== "inactive") {
         recorder.stop();
       }
-
-      segmenterRef.current?.dispose();
-      segmenterRef.current = null;
 
       void faceDetectorRef.current?.dispose();
       faceDetectorRef.current = null;
@@ -477,7 +415,7 @@ export function useCamera({
       const frame = captureCanvasFrame(recordingCanvas);
       if (!frame) return;
 
-      videoFramesRef.current.push(frame);
+      videoFramesRef.current.push(grayscaleImageData(frame));
       setCapturedFrameCount(videoFramesRef.current.length);
     };
 
@@ -498,6 +436,7 @@ export function useCamera({
   return {
     canvasRef,
     isModelLoading,
+    isPreviewReady,
     controls: {
       isRecording,
       isModelLoading,

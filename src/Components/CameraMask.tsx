@@ -18,6 +18,7 @@ type CameraMaskProps = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   isVideoReady: boolean;
   isModelLoading: boolean;
+  isPreviewReady?: boolean;
   countdown?: number | null;
   width?: number;
   height?: number;
@@ -116,6 +117,7 @@ export function CameraMask({
   canvasRef,
   isVideoReady,
   isModelLoading,
+  isPreviewReady = false,
   countdown = null,
   width = 700,
   height = 550,
@@ -129,7 +131,7 @@ export function CameraMask({
   style,
   children,
 }: CameraMaskProps) {
-  const useCanvasFeed = isVideoReady && !isModelLoading;
+  const useCanvasFeed = isVideoReady && !isModelLoading && isPreviewReady;
   const canvasTexture = useCanvasTexture(canvasRef, useCanvasFeed);
   const videoTexture = useVideoTexture(videoRef, isVideoReady);
   const feedTexture = canvasTexture ?? videoTexture;

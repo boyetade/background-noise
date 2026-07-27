@@ -196,6 +196,7 @@ function App() {
                 canvasRef={camera.canvasRef}
                 isVideoReady={isWebcamReady}
                 isModelLoading={camera.isModelLoading}
+                isPreviewReady={camera.isPreviewReady}
                 countdown={recordingCountdown}
                 showPaperOutline={false}
               />
