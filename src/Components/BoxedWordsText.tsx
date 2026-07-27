@@ -19,10 +19,7 @@ export function BoxedWordsText({
   style,
   boxClassName = "",
 }: BoxedWordsTextProps) {
-  const words = useMemo(
-    () => text.trim().split(/\s+/).filter(Boolean),
-    [text],
-  );
+  const words = useMemo(() => text.trim().split(/\s+/).filter(Boolean), [text]);
 
   return (
     <div
