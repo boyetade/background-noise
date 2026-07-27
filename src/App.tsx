@@ -12,6 +12,7 @@ import { CameraMask } from "./Components/CameraMask";
 import { PaperCameraFrame } from "./Components/PaperCameraFrame";
 import { AppBackground } from "./Components/AppBackground";
 import { RecordVideoPrompt } from "./Components/RecordVideoPrompt";
+import { BoxedWordsText } from "./Components/BoxedWordsText";
 
 const CAMERA_FRAME_WIDTH = 750;
 const CAMERA_FRAME_HEIGHT = 500;
@@ -44,12 +45,17 @@ function App() {
     null,
   );
 
-  const handleRecordingStart = () => {
+  const resetRecordingState = () => {
     setHasRecording(false);
     setStarGifUrls(Array.from({ length: STAR_COUNT }, () => null));
     setStarFaceRegions([]);
     setStarGifError(null);
     setIsCreatingStarGifs(false);
+    setRecordingCountdown(null);
+  };
+
+  const handleRecordingStart = () => {
+    resetRecordingState();
   };
 
   const handleRecordingComplete = (recordingResult: StarRecordingResult) => {
@@ -162,7 +168,8 @@ function App() {
               <HandDrawnCircle
                 className="absolute left-1/2 z-20 -translate-x-1/2"
                 style={{
-                  top: CAMERA_MASK_TOP + CAMERA_FRAME_HEIGHT + RECORD_BUTTON_GAP,
+                  top:
+                    CAMERA_MASK_TOP + CAMERA_FRAME_HEIGHT + RECORD_BUTTON_GAP,
                 }}
                 radius={26}
                 onClick={handleRecordClick}
@@ -181,16 +188,36 @@ function App() {
             />
           </div>
         ) : (
-          <Star
-            key={starFaceRegions.join(",")}
-            hasRecording={hasRecording}
-            starGifUrls={starGifUrls}
-            faceRegions={starFaceRegions}
-            captureError={starGifError}
-            stageWidth={STAR_STAGE_WIDTH}
-            stageHeight={STAR_STAGE_HEIGHT}
-            stageColor={DEFAULT_STAGE_COLOR}
-          />
+          <>
+            <button
+              type="button"
+              onClick={resetRecordingState}
+              className="absolute left-4 top-4 z-20 cursor-pointer border-0 bg-transparent p-6 hover:opacity-90"
+            >
+              <BoxedWordsText
+                text="Have another moment of expression?"
+                boxClassName="text-2xl"
+              />
+            </button>
+
+            <div className="flex flex-col items-center gap-4">
+              <BoxedWordsText
+                text="A Constelliation of You"
+                boxClassName="text-2xl"
+              />
+
+              <Star
+                key={starFaceRegions.join(",")}
+                hasRecording={hasRecording}
+                starGifUrls={starGifUrls}
+                faceRegions={starFaceRegions}
+                captureError={starGifError}
+                stageWidth={STAR_STAGE_WIDTH}
+                stageHeight={STAR_STAGE_HEIGHT}
+                stageColor={DEFAULT_STAGE_COLOR}
+              />
+            </div>
+          </>
         )}
       </div>
     </>

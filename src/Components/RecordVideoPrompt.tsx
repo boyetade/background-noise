@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { BoxedWordsText } from "./BoxedWordsText";
 import { isQuentinFontReady, preloadFonts } from "../loadFonts";
 
 type RecordVideoPromptProps = {
@@ -38,11 +39,11 @@ export function RecordVideoPrompt({
   }
 
   return (
-    <p
-      className={`max-w-48 -rotate-2 font-quentin text-2xl leading-tight text-white ${className ?? ""}`}
+    <BoxedWordsText
+      text="Have 8 seconds of expression"
+      className={`max-w-48 ${className ?? ""}`}
       style={style}
-    >
-      Have 8 seconds of expression
-    </p>
+      boxClassName="text-2xl"
+    />
   );
 }

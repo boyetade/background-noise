@@ -217,6 +217,7 @@ export const Star = ({
         className="relative"
         style={{ width: stageWidth, height: stageHeight }}
       >
+      
         <Application
           width={stageWidth}
           height={stageHeight}
