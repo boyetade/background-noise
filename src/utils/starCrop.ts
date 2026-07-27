@@ -2,7 +2,30 @@ import { Texture } from "pixi.js";
 
 const STAR_POINTS = 5;
 const STAR_INNER_RATIO = 0.5;
-const STAR_GIF_BACKGROUND = "#73061a";
+
+export const STAR_GIF_BACKGROUND = "#73061a";
+
+export const STAR_BACKGROUND_COLORS = [
+  STAR_GIF_BACKGROUND,
+  "#2b48d9",
+  "#1a5c3a",
+  "#5c1a4a",
+  "#8b4513",
+  "#1e3a5f",
+  "#6b2d5c",
+  "#3d2b1f",
+] as const;
+
+export function pickNextStarBackgroundColor(currentColor: string): string {
+  const current = currentColor.toLowerCase();
+  const options = STAR_BACKGROUND_COLORS.filter(
+    (color) => color.toLowerCase() !== current,
+  );
+
+  return (
+    options[Math.floor(Math.random() * options.length)] ?? STAR_GIF_BACKGROUND
+  );
+}
 
 function traceStarPath(
   ctx: CanvasRenderingContext2D,
@@ -41,6 +64,7 @@ function cropCanvasToStar(
   sourceCanvas: HTMLCanvasElement,
   outputSize: number,
   rotationRadians = 0,
+  backgroundColor: string = STAR_GIF_BACKGROUND,
 ): string {
   const outputCanvas = document.createElement("canvas");
   outputCanvas.width = outputSize;
@@ -54,7 +78,7 @@ function cropCanvasToStar(
   const outerRadius = outputSize / 2;
   const innerRadius = outerRadius * STAR_INNER_RATIO;
 
-  ctx.fillStyle = STAR_GIF_BACKGROUND;
+  ctx.fillStyle = backgroundColor;
   ctx.fillRect(0, 0, outputSize, outputSize);
 
   ctx.beginPath();
@@ -113,6 +137,7 @@ export function cropImageDataToStar(
   imageData: ImageData,
   outputSize = 300,
   rotationRadians = 0,
+  backgroundColor: string = STAR_GIF_BACKGROUND,
 ): string {
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = imageData.width;
@@ -136,7 +161,7 @@ export function cropImageDataToStar(
 
   scaledCtx.drawImage(sourceCanvas, 0, 0, outputSize, outputSize);
 
-  return cropCanvasToStar(scaledCanvas, outputSize, rotationRadians);
+  return cropCanvasToStar(scaledCanvas, outputSize, rotationRadians, backgroundColor);
 }
 
 export function createStarPreviewTexture(dataUrl: string): Texture {

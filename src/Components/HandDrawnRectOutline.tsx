@@ -2,7 +2,7 @@ import "../pixi/setup";
 import { Application, useTick } from "@pixi/react";
 import { useCallback, useMemo, useRef, type ReactNode } from "react";
 import type { Graphics } from "pixi.js";
-import { createHandDrawnRectPaths, type Point } from "../utils/handDrawnRect";
+import { createHandDrawnRectPath, createHandDrawnRectPaths, type Point } from "../utils/handDrawnRect";
 import { CameraViewfinderOverlay } from "./CameraViewfinderOverlay";
 
 export const OUTLINE_FRAME_COUNT = 3;
@@ -16,8 +16,11 @@ type HandDrawnRectOutlineProps = {
   strokeColor?: string | number;
   strokeWidth?: number;
   jitter?: number;
+  step?: number;
   inset?: number;
   contentInset?: number;
+  animated?: boolean;
+  showViewfinderOverlay?: boolean;
   isRecording?: boolean;
   recordingSecondsLeft?: string;
   capturedFrameCount?: number;
@@ -109,6 +112,27 @@ function AnimatedHandDrawnRect({
   return <pixiGraphics draw={draw} />;
 }
 
+type StaticHandDrawnRectProps = {
+  path: Point[];
+  strokeColor: string | number;
+  strokeWidth: number;
+};
+
+function StaticHandDrawnRect({
+  path,
+  strokeColor,
+  strokeWidth,
+}: StaticHandDrawnRectProps) {
+  const draw = useCallback(
+    (graphics: Graphics) => {
+      drawPath(graphics, path, strokeColor, strokeWidth);
+    },
+    [path, strokeColor, strokeWidth],
+  );
+
+  return <pixiGraphics draw={draw} />;
+}
+
 export function HandDrawnRectOutline({
   width,
   height,
@@ -116,8 +140,11 @@ export function HandDrawnRectOutline({
   strokeColor = "#000000",
   strokeWidth = 2.5,
   jitter = 3,
+  step = 10,
   inset = OUTLINE_DEFAULT_INSET,
   contentInset,
+  animated = true,
+  showViewfinderOverlay = true,
   isRecording = false,
   recordingSecondsLeft,
   capturedFrameCount,
@@ -125,15 +152,26 @@ export function HandDrawnRectOutline({
   children,
 }: HandDrawnRectOutlineProps) {
   const resolvedContentInset = contentInset ?? inset;
+  const path = useMemo(
+    () =>
+      createHandDrawnRectPath(0, 0, width, height, {
+        seed,
+        jitter,
+        inset,
+        step,
+      }),
+    [width, height, seed, jitter, inset, step],
+  );
   const paths = useMemo(
     () =>
       createHandDrawnRectPaths(0, 0, width, height, {
         seed,
         jitter,
         inset,
+        step,
         passes: OUTLINE_FRAME_COUNT,
       }),
-    [width, height, seed, jitter, inset],
+    [width, height, seed, jitter, inset, step],
   );
 
   return (
@@ -160,21 +198,31 @@ export function HandDrawnRectOutline({
           autoStart
           className="block h-full w-full"
         >
-          <AnimatedHandDrawnRect
-            paths={paths}
-            strokeColor={strokeColor}
-            strokeWidth={strokeWidth}
-          />
+          {animated ? (
+            <AnimatedHandDrawnRect
+              paths={paths}
+              strokeColor={strokeColor}
+              strokeWidth={strokeWidth}
+            />
+          ) : (
+            <StaticHandDrawnRect
+              path={path}
+              strokeColor={strokeColor}
+              strokeWidth={strokeWidth}
+            />
+          )}
         </Application>
       </div>
 
-      <CameraViewfinderOverlay
-        isRecording={isRecording}
-        recordingSecondsLeft={recordingSecondsLeft}
-        capturedFrameCount={capturedFrameCount}
-        maxFrames={maxFrames}
-        inset={resolvedContentInset}
-      />
+      {showViewfinderOverlay ? (
+        <CameraViewfinderOverlay
+          isRecording={isRecording}
+          recordingSecondsLeft={recordingSecondsLeft}
+          capturedFrameCount={capturedFrameCount}
+          maxFrames={maxFrames}
+          inset={resolvedContentInset}
+        />
+      ) : null}
     </div>
   );
 }

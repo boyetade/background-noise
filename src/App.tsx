@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { HandDrawnCircle } from "./Components/HandDrawnCircle";
-import { Star, DEFAULT_STAGE_COLOR } from "./Components/Star";
+import { Star } from "./Components/Star";
 import { useCamera } from "./hooks/useCamera";
 import { useWebcamStream } from "./hooks/useWebcamStream";
 import {
   STAR_COUNT,
   buildStarGifUrls,
+  STAR_GIF_BACKGROUND,
+  pickNextStarBackgroundColor,
   type StarRecordingResult,
 } from "./utils/starGifs";
 import { CameraMask } from "./Components/CameraMask";
@@ -39,6 +41,9 @@ function App() {
   const [starFaceRegions, setStarFaceRegions] = useState<
     StarRecordingResult["faceRegions"]
   >([]);
+  const [starRecordingResult, setStarRecordingResult] =
+    useState<StarRecordingResult | null>(null);
+  const [stageColor, setStageColor] = useState(STAR_GIF_BACKGROUND);
   const [isCreatingStarGifs, setIsCreatingStarGifs] = useState(false);
   const [starGifError, setStarGifError] = useState<string | null>(null);
   const [recordingCountdown, setRecordingCountdown] = useState<number | null>(
@@ -49,6 +54,8 @@ function App() {
     setHasRecording(false);
     setStarGifUrls(Array.from({ length: STAR_COUNT }, () => null));
     setStarFaceRegions([]);
+    setStarRecordingResult(null);
+    setStageColor(STAR_GIF_BACKGROUND);
     setStarGifError(null);
     setIsCreatingStarGifs(false);
     setRecordingCountdown(null);
@@ -58,14 +65,18 @@ function App() {
     resetRecordingState();
   };
 
-  const handleRecordingComplete = (recordingResult: StarRecordingResult) => {
-    setHasRecording(true);
-    setStarFaceRegions(recordingResult.faceRegions);
-    setIsCreatingStarGifs(true);
-    setStarGifError(null);
-    setStarGifUrls(Array.from({ length: STAR_COUNT }, () => null));
+  const rebuildStarGifs = (
+    recordingResult: StarRecordingResult,
+    backgroundColor: string,
+    showLoading = false,
+  ) => {
+    if (showLoading) {
+      setIsCreatingStarGifs(true);
+    }
 
-    void buildStarGifUrls(recordingResult)
+    setStarGifError(null);
+
+    void buildStarGifUrls(recordingResult, backgroundColor)
       .then((gifs) => {
         setStarGifUrls(gifs);
       })
@@ -75,8 +86,29 @@ function App() {
         );
       })
       .finally(() => {
-        setIsCreatingStarGifs(false);
+        if (showLoading) {
+          setIsCreatingStarGifs(false);
+        }
       });
+  };
+
+  const handleRecordingComplete = (recordingResult: StarRecordingResult) => {
+    setHasRecording(true);
+    setStarRecordingResult(recordingResult);
+    setStarFaceRegions(recordingResult.faceRegions);
+    setStageColor(STAR_GIF_BACKGROUND);
+    setStarGifUrls(Array.from({ length: STAR_COUNT }, () => null));
+    rebuildStarGifs(recordingResult, STAR_GIF_BACKGROUND, true);
+  };
+
+  const handleShuffleStageColor = () => {
+    if (!starRecordingResult) {
+      return;
+    }
+
+    const nextColor = pickNextStarBackgroundColor(stageColor);
+    setStageColor(nextColor);
+    rebuildStarGifs(starRecordingResult, nextColor);
   };
 
   const camera = useCamera({
@@ -128,6 +160,9 @@ function App() {
     camera.controls.isRecording ||
     camera.controls.isModelLoading ||
     recordingCountdown !== null;
+
+  const isRecordPromptHidden =
+    camera.controls.isRecording || recordingCountdown !== null;
 
   const isStarReady = hasRecording && !isCreatingStarGifs;
 
@@ -184,7 +219,7 @@ function App() {
                 top: `calc(50% - ${PAPER_FRAME_EXTRA_HEIGHT / 2}px)`,
                 left: `calc(50% + ${RECORD_PROMPT_OFFSET}px + 2.5rem)`,
               }}
-              hidden={isRecordUiLocked}
+              hidden={isRecordPromptHidden}
             />
           </div>
         ) : (
@@ -200,7 +235,7 @@ function App() {
               />
             </button>
 
-            <div className="flex flex-col items-center gap-4">
+            <div className="flex w-full flex-col items-center justify-center gap-4">
               <BoxedWordsText
                 text="A Constelliation of You"
                 boxClassName="text-2xl"
@@ -214,7 +249,8 @@ function App() {
                 captureError={starGifError}
                 stageWidth={STAR_STAGE_WIDTH}
                 stageHeight={STAR_STAGE_HEIGHT}
-                stageColor={DEFAULT_STAGE_COLOR}
+                stageColor={stageColor}
+                onShuffleStageColor={handleShuffleStageColor}
               />
             </div>
           </>

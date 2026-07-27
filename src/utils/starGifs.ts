@@ -1,6 +1,11 @@
 import type { FaceRegion } from "./faceZoom";
 import { createGifFromDataUrls } from "./createGifFromFrames";
-import { cropImageDataToStar } from "./starCrop";
+import {
+  cropImageDataToStar,
+  STAR_GIF_BACKGROUND,
+} from "./starCrop";
+
+export { STAR_GIF_BACKGROUND, STAR_BACKGROUND_COLORS, pickNextStarBackgroundColor } from "./starCrop";
 
 export const STAR_COUNT = 3;
 export const FRAMES_PER_STAR = 5;
@@ -40,6 +45,7 @@ export function createStarRecordingResult(
 
 export async function buildStarGifUrls(
   recordingResult: StarRecordingResult,
+  backgroundColor: string = STAR_GIF_BACKGROUND,
 ): Promise<(string | null)[]> {
   const frameGroups = splitFramesAcrossStars(recordingResult.frames);
 
@@ -54,6 +60,7 @@ export async function buildStarGifUrls(
           frame,
           STAR_OUTPUT_SIZE,
           recordingResult.starRotations[starIndex] ?? 0,
+          backgroundColor,
         ),
       );
 

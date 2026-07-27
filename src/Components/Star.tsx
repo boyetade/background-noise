@@ -4,12 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Assets, Texture, type Graphics } from "pixi.js";
 import { type FaceRegion } from "../utils/faceZoom";
 import { STAR_COUNT, STAR_OUTPUT_SIZE } from "../utils/starGifs";
+import { STAR_GIF_BACKGROUND } from "../utils/starCrop";
 import starTexture from "../assets/starTexture.png";
+import { BoxedWordsText } from "./BoxedWordsText";
+import { HandDrawnRectOutline } from "./HandDrawnRectOutline";
 
 export const DEFAULT_STAGE_WIDTH = 800;
 export const DEFAULT_STAGE_HEIGHT = 200;
-export const DEFAULT_STAGE_COLOR = "#73061a";
+export const DEFAULT_STAGE_COLOR = STAR_GIF_BACKGROUND;
 export const STAR_REVEAL_INTERVAL_MS = 1000;
+export const STAR_BORDER_PADDING = 6;
 
 const STAGE_PADDING_Y = 40;
 const STAGE_PADDING_X = 10;
@@ -90,6 +94,7 @@ type StarProps = {
   stageWidth?: number;
   stageHeight?: number;
   stageColor?: string | number;
+  onShuffleStageColor?: () => void;
 };
 
 function createPlacementBounds(
@@ -104,20 +109,32 @@ function createPlacementBounds(
   };
 }
 
+function createSeededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+
+  return () => {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
 function createRandomStarPositions(
   stageWidth: number,
   stageHeight: number,
+  seed?: number,
 ): StarPosition[] {
   const bounds = createPlacementBounds(stageWidth, stageHeight);
   const placed: StarPosition[] = [];
+  const random =
+    seed === undefined ? Math.random : createSeededRandom(seed);
 
   for (let starIndex = 0; starIndex < STAR_COUNT; starIndex += 1) {
     let position: StarPosition | null = null;
 
     for (let attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt += 1) {
       const candidate: StarPosition = {
-        x: bounds.minX + Math.random() * Math.max(0, bounds.maxX - bounds.minX),
-        y: bounds.minY + Math.random() * Math.max(0, bounds.maxY - bounds.minY),
+        x: bounds.minX + random() * Math.max(0, bounds.maxX - bounds.minX),
+        y: bounds.minY + random() * Math.max(0, bounds.maxY - bounds.minY),
       };
 
       if (
@@ -163,17 +180,32 @@ export const Star = ({
   stageWidth = DEFAULT_STAGE_WIDTH,
   stageHeight = DEFAULT_STAGE_HEIGHT,
   stageColor = DEFAULT_STAGE_COLOR,
+  onShuffleStageColor,
 }: StarProps) => {
   const placementKey = faceRegions.join(",");
   const [visibleStarCount, setVisibleStarCount] = useState(0);
+  const [positionSeed, setPositionSeed] = useState(0);
 
   const starPositions = useMemo(() => {
     if (!hasRecording || !placementKey) {
       return [];
     }
 
-    return createRandomStarPositions(stageWidth, stageHeight);
-  }, [hasRecording, placementKey, stageWidth, stageHeight]);
+    let seed = 0;
+    for (let index = 0; index < placementKey.length; index += 1) {
+      seed = (Math.imul(31, seed) + placementKey.charCodeAt(index)) >>> 0;
+    }
+
+    return createRandomStarPositions(
+      stageWidth,
+      stageHeight,
+      seed + positionSeed,
+    );
+  }, [hasRecording, placementKey, stageWidth, stageHeight, positionSeed]);
+
+  const shuffleStarPositions = () => {
+    setPositionSeed((current) => current + 1);
+  };
 
   useEffect(() => {
     const timerIds = Array.from({ length: STAR_COUNT }, (_, index) =>
@@ -210,67 +242,101 @@ export const Star = ({
   }, [texture]);
 
   return (
-    <div>
+    <div className="w-full">
       {captureError && <p className="text-red-600">{captureError}</p>}
 
-      <div
-        className="relative"
-        style={{ width: stageWidth, height: stageHeight }}
-      >
-      
-        <Application
-          width={stageWidth}
-          height={stageHeight}
-          backgroundAlpha={0}
-          antialias
-          eventMode="none"
-          autoStart
-          className="absolute inset-0 block h-full w-full"
+      <div className="relative flex w-full items-center justify-center">
+        <HandDrawnRectOutline
+          width={stageWidth + STAR_BORDER_PADDING * 2}
+          height={stageHeight + STAR_BORDER_PADDING * 2}
+          inset={STAR_BORDER_PADDING}
+          contentInset={STAR_BORDER_PADDING}
+          strokeColor="#ffffff"
+          strokeWidth={1}
+          jitter={0.35}
+          step={28}
+          seed={17}
+          animated={false}
+          showViewfinderOverlay={false}
         >
-          <pixiGraphics draw={drawStage} />
-        </Application>
-
-        {starGifUrls.map((gifUrl, index) => {
-          if (index >= visibleStarCount) {
-            return null;
-          }
-
-          const position = starPositions[index];
-          if (!position) {
-            return null;
-          }
-
-          return (
-            <div
-              key={index}
-              className="absolute z-10"
-              style={{
-                left: position.x,
-                top: position.y,
-                width: STAR_OUTPUT_SIZE,
-                height: STAR_OUTPUT_SIZE,
-              }}
+          <div
+            className="relative h-full w-full"
+            style={{ width: stageWidth, height: stageHeight }}
+          >
+            <Application
+              width={stageWidth}
+              height={stageHeight}
+              backgroundAlpha={0}
+              antialias
+              eventMode="none"
+              autoStart
+              className="absolute inset-0 block h-full w-full"
             >
-              {gifUrl ? (
-                <img
-                  src={gifUrl}
-                  alt={`Star crop GIF ${index + 1}`}
-                  width={STAR_OUTPUT_SIZE}
-                  height={STAR_OUTPUT_SIZE}
-                  className="block"
-                />
-              ) : (
+              <pixiGraphics draw={drawStage} />
+            </Application>
+
+            {starGifUrls.map((gifUrl, index) => {
+              if (index >= visibleStarCount) {
+                return null;
+              }
+
+              const position = starPositions[index];
+              if (!position) {
+                return null;
+              }
+
+              return (
                 <div
-                  className="border border-dashed border-white/60 bg-black/10"
+                  key={index}
+                  className="absolute z-10"
                   style={{
+                    left: position.x,
+                    top: position.y,
                     width: STAR_OUTPUT_SIZE,
                     height: STAR_OUTPUT_SIZE,
                   }}
-                />
-              )}
-            </div>
-          );
-        })}
+                >
+                  {gifUrl ? (
+                    <img
+                      src={gifUrl}
+                      alt={`Star crop GIF ${index + 1}`}
+                      width={STAR_OUTPUT_SIZE}
+                      height={STAR_OUTPUT_SIZE}
+                      className="block"
+                    />
+                  ) : (
+                    <div
+                      className="border border-dashed border-white/60 bg-black/10"
+                      style={{
+                        width: STAR_OUTPUT_SIZE,
+                        height: STAR_OUTPUT_SIZE,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </HandDrawnRectOutline>
+
+        <div className="absolute right-4 top-1/2 flex -translate-y-1/2 flex-col gap-3">
+          <button
+            type="button"
+            onClick={shuffleStarPositions}
+            className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90"
+          >
+            <BoxedWordsText text="Shuffle stars" boxClassName="text-lg" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onShuffleStageColor}
+            disabled={!onShuffleStageColor}
+            className="cursor-pointer border-0 bg-transparent p-0 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <BoxedWordsText text="Shuffle color" boxClassName="text-lg" />
+          </button>
+        </div>
       </div>
     </div>
   );
